@@ -1,6 +1,6 @@
 {
   "name": "memory-qdrant-mcp",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "type": "module",
   "main": "server/index.js",
   "bin": {
