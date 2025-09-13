@@ -1,4 +1,4 @@
-# Memory Qdrant MCP Strategy
+# Memory MCP Strategy
 
 memory_qdrant_strategy:
   workspace_id_source: "Use the current workspace absolute path as project_name for all tool calls."
