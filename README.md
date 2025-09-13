@@ -40,20 +40,100 @@ node server/index.js
 ## Prerequisites
 
 - **Qdrant Database**: The server requires a running Qdrant instance
+
+  **Option 1: Simple Docker run**
   ```bash
   docker run -p 6333:6333 qdrant/qdrant
   ```
 
-- **Environment Variables**: Create a `.env` file or set environment variables:
+  **Option 2: Docker Compose (Recommended for production)**
+  Create a `docker-compose.yml` file:
+  ```yaml
+  services:
+    qdrant:
+      image: qdrant/qdrant:latest
+      container_name: qdrant
+      restart: unless-stopped
+      ports:
+        - "6333:6333"
+        - "6334:6334"
+      environment:
+        QDRANT__SERVICE__CORS: "true"
+      volumes:
+        - qdrant_data:/qdrant/storage
+
+  volumes:
+    qdrant_data:
+      driver: local
+  ```
+
+  Then run:
+  ```bash
+  docker-compose up -d
+  ```
+
+- **Environment Variables**: Copy `.env.example` to `.env` and configure:
+  ```bash
+  cp .env.example .env
+  ```
+
+  **Embedding Provider** (choose one):
+  ```env
+  # Option 1: Google Gemini (default, fast, recommended)
+  GEMINI_API_KEY=your_gemini_api_key_here
+
+  # Option 2: Ollama (local, free, slower)
+  OLLAMA_BASE_URL=http://localhost:11434
+
+  # Option 3: OpenRouter (no embedding models available - use Gemini or Ollama above)
+  ```
+
+  **Model Configuration** (optional, defaults provided):
+  ```env
+  EMBEDDING_MODEL=models/text-embedding-004     # Gemini default (use nomic-embed-text:v1.5 for Ollama)
+  SUMMARIZER_MODEL=openai/gpt-oss-20b:free      # OpenRouter default (use gemini/gemini-2.0-flash-exp for Gemini, Any model in ollama is slow)
+  DEFAULT_TOP_K_MEMORY_QUERY=3                  # Search result limit
+  ```
+
+  **Required**:
   ```env
   QDRANT_URL=http://localhost:6333
-  EMBEDDING_PROVIDER=gemini  # or 'ollama' or 'fastembed'
-  GEMINI_API_KEY=your_gemini_api_key  # if using Gemini
   ```
 
 ## MCP Configuration
 
-To use with Roo or other MCP clients, add to your MCP settings:
+### For VSCode GitHub Copilot
+
+Create or update the MCP settings file at:
+- **Windows**: `%APPDATA%\Code\User\globalStorage\github.copilot-chat\settings\mcp.json`
+- **macOS**: `~/Library/Application Support/Code/User/globalStorage/github.copilot-chat/settings/mcp.json`
+- **Linux**: `~/.config/Code/User/globalStorage/github.copilot-chat/settings/mcp.json`
+
+Add the following configuration:
+
+```json
+{
+  "mcpServers": {
+    "memory-qdrant-mcp": {
+      "command": "npx",
+      "args": ["memory-qdrant-mcp"],
+      "env": {
+        "QDRANT_URL": "http://localhost:6333",
+        "GEMINI_API_KEY": "your_gemini_api_key_here",
+        "OPENROUTER_API_KEY": "your_openrouter_api_key_here",
+        "OLLAMA_BASE_URL": "http://localhost:11434",
+        "EMBEDDING_MODEL": "models/text-embedding-004",
+        "DEFAULT_TOP_K_MEMORY_QUERY": "3",
+        "SUMMARIZER_MODEL": "openai/gpt-oss-20b:free"
+      }
+    }
+  }
+}
+```
+
+### For Roo
+
+Add to your Roo MCP settings:
 
 ```json
 {
