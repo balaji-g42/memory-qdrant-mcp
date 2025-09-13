@@ -79,19 +79,20 @@ node server/index.js
 
   **Embedding Provider** (choose one):
   ```env
-  # Option 1: Google Gemini (default, fast, recommended)
+  # Option 1: Google Gemini (fast, recommended - uses Gemini for both embedding and summarization)
   GEMINI_API_KEY=your_gemini_api_key_here
 
   # Option 2: Ollama (local, free, slower)
   OLLAMA_BASE_URL=http://localhost:11434
 
-  # Option 3: OpenRouter (no embedding models available - use Gemini or Ollama above)
+  # Option 3: OpenRouter + Gemini/Ollama (OpenRouter for summarization, Gemini/Ollama for embedding)
+  OPENROUTER_API_KEY=your_openrouter_api_key_here
   ```
 
   **Model Configuration** (optional, defaults provided):
   ```env
   EMBEDDING_MODEL=models/text-embedding-004     # Gemini default (use nomic-embed-text:v1.5 for Ollama)
-  SUMMARIZER_MODEL=openai/gpt-oss-20b:free      # OpenRouter default (use gemini/gemini-2.0-flash-exp for Gemini, Any model in ollama is slow)
+  SUMMARIZER_MODEL=openai/gpt-oss-20b:free      # OpenRouter default (auto-switches to Gemini if no OpenRouter key)
   DEFAULT_TOP_K_MEMORY_QUERY=3                  # Search result limit
   ```
 
