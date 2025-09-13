@@ -152,6 +152,30 @@ server.tool(
     },
 );
 
+server.tool(
+    "query_memory_summarized",
+    "Query memory entries and return summarized results to reduce token usage",
+    {
+        project_name: z.string().describe("Name of the project"),
+        query_text: z.string().describe("Query text"),
+        memory_type: z.string().optional().describe("Optional memory type filter"),
+        top_k: z.number().optional().default(3).describe("Number of results to return")
+    },
+    async ({ project_name, query_text, memory_type, top_k }) => {
+        const results = await queryMemory(project_name, query_text, memory_type, top_k);
+        const resultsText = JSON.stringify(results, null, 2);
+        const summary = await summarizeText(resultsText);
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: summary,
+                },
+            ],
+        };
+    },
+);
+
 // ConPort-style structured context tools
 server.tool(
     "get_product_context",
