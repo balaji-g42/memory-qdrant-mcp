@@ -9,6 +9,22 @@ An MCP (Model Context Protocol) server that provides memory management capabilit
 - **Multiple Providers**: Support for Gemini, Ollama, and FastEmbed embedding providers
 - **MCP Integration**: Full MCP stdio server implementation
 - **REST API**: Additional HTTP endpoints for direct access
+- **Workspace Management**: Automatic project detection and memory bank initialization
+- **Import/Export**: Markdown-based memory bank import and export functionality
+- **Conversation Analysis**: Automatic logging of relevant information from conversations
+- **Performance Optimization**: Connection pooling, LRU caching, and cache invalidation for improved performance
+- **End-to-End Testing**: Comprehensive test suite with MCP Inspector for protocol compliance
+
+## Performance Features
+
+- **Connection Pooling**: Configurable Qdrant client connection pool for better concurrent performance
+- **LRU Caching**: Least Recently Used cache implementation for:
+  - Embeddings (reduces API calls for repeated text)
+  - Query results (faster repeated searches)
+  - Context and pattern data (improved retrieval speed)
+- **Cache Invalidation**: Automatic cache clearing when data is modified to ensure consistency
+- **Configurable Cache Sizes**: Adjustable TTL and size limits for different cache types
+- **Cache Statistics**: Built-in cache performance monitoring and statistics
 
 ## Installation
 
@@ -149,7 +165,9 @@ Add to your Roo MCP settings:
 
 ## Available Tools
 
-### log_memory
+### Core Memory Tools
+
+#### log_memory
 Log a memory entry to the vector database.
 
 **Parameters:**
@@ -158,7 +176,7 @@ Log a memory entry to the vector database.
 - `content` (string): Content to log
 - `top_level_id` (string, optional): Optional top level ID
 
-### query_memory
+#### query_memory
 Query memory entries from the vector database.
 
 **Parameters:**
@@ -167,7 +185,7 @@ Query memory entries from the vector database.
 - `memory_type` (string, optional): Optional memory type filter
 - `top_k` (number, optional): Number of results to return (default: 3)
 
-### log_decision
+#### log_decision
 Log a decision entry.
 
 **Parameters:**
@@ -175,7 +193,7 @@ Log a decision entry.
 - `decision_text` (string): Decision text
 - `top_level_id` (string, optional): Optional top level ID
 
-### log_progress
+#### log_progress
 Log a progress entry.
 
 **Parameters:**
@@ -183,11 +201,57 @@ Log a progress entry.
 - `progress_text` (string): Progress text
 - `top_level_id` (string, optional): Optional top level ID
 
-### summarize_text
+#### summarize_text
 Summarize the given text.
 
 **Parameters:**
 - `text` (string): Text to summarize
+
+### Workspace Management Tools
+
+#### initialize_workspace
+Initialize a new workspace with automatic project detection and memory bank setup.
+
+**Parameters:**
+- `projectName` (string): Name of the project
+- `workspaceInfo` (object): Workspace information containing files and directories
+  - `files` (array): List of file paths in the workspace
+  - `directories` (array): List of directory paths in the workspace
+
+#### sync_memory
+Synchronize memory bank with current workspace state and log any changes.
+
+**Parameters:**
+- `projectName` (string): Name of the project
+- `workspaceInfo` (object): Current workspace information
+  - `files` (array): List of current file paths
+  - `directories` (array): List of current directory paths
+
+### Import/Export Tools
+
+#### export_memory_to_markdown
+Export all memory entries for a project to markdown files.
+
+**Parameters:**
+- `projectName` (string): Name of the project
+- `outputPath` (string, optional): Output directory path (default: "./memory-bank")
+
+#### import_memory_from_markdown
+Import memory entries from markdown files into the vector database.
+
+**Parameters:**
+- `projectName` (string): Name of the project
+- `inputPath` (string, optional): Input directory path (default: "./memory-bank")
+
+### Analysis Tools
+
+#### analyze_conversation
+Analyze a conversation and automatically log relevant information to memory.
+
+**Parameters:**
+- `projectName` (string): Name of the project
+- `conversation` (string): The conversation text to analyze
+- `context` (string, optional): Additional context about the conversation
 
 ## Publishing to npm
 
@@ -230,8 +294,13 @@ memory-qdrant-mcp/
 │   │   ├── geminiVertex.js
 │   │   ├── ollama.js
 │   │   └── fastEmbed.js
+│   ├── cache.js              # LRU caching implementation
 │   └── config.js             # Configuration
-├── memory-bank/              # Project documentation
+├── test/                     # Test files
+│   ├── memoryBankTools.test.js
+│   └── mcpServer.integration.test.js
+├── babel.config.cjs          # Babel configuration for testing
+├── jest.config.cjs           # Jest configuration
 ├── package.json
 └── README.md
 ```
@@ -241,6 +310,28 @@ memory-qdrant-mcp/
 1. Implement the tool in `server/mcp_tools/`
 2. Register it in `server/index.js`
 3. Update this README
+
+## Testing
+
+The project includes comprehensive testing using MCP Inspector for protocol compliance:
+
+### Running MCP Inspector Tests
+
+```bash
+npx @modelcontextprotocol/inspector node server/index.js
+```
+
+This will start the MCP Inspector at `http://localhost:6274` where you can test all MCP tools interactively.
+
+### Test Coverage
+
+MCP Inspector tests cover:
+- MCP protocol initialization and tool listing
+- Memory bank operations (logging, querying)
+- Workspace management and synchronization
+- Import/export functionality
+- Conversation analysis
+- Performance optimizations (caching, connection pooling)
 
 ## License
 
