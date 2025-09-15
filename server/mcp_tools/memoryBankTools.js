@@ -68,7 +68,7 @@ async function getCachedEmbeddings(texts) {
     return results;
 }
 
-const MEMORY_TYPES = ["productContext", "activeContext", "systemPatterns", "decisionLog", "progress"];
+const MEMORY_TYPES = ["productContext", "activeContext", "systemPatterns", "decisionLog", "progress", "contextHistory"];
 
 // ConPort structured context types
 const STRUCTURED_CONTEXT_TYPES = ["productContext", "activeContext"];
@@ -517,33 +517,40 @@ async function batchQueryMemory(projectName, queries) {
         throw new Error("Queries must be a non-empty array");
     }
 
-    const collectionName = `memory_bank_${projectName}`;
+    try {
+        // Initialize memory bank - this can fail if Qdrant is unavailable
+        const collectionName = await initMemoryBank(projectName);
 
-    // Process all queries in parallel
-    const queryPromises = queries.map(async (query) => {
-        const vectors = await getCachedEmbeddings([query.queryText]);
-        const vector = vectors[0];
+        // Process all queries in parallel
+        const queryPromises = queries.map(async (query) => {
+            const vectors = await getCachedEmbeddings([query.queryText]);
+            const vector = vectors[0];
 
-        // Build filter
-        const mustFilter = [{ key: "project", match: { value: projectName } }];
-        if (query.memoryType) mustFilter.push({ key: "type", match: { value: query.memoryType } });
+            // Build filter
+            const mustFilter = [{ key: "project", match: { value: projectName } }];
+            if (query.memoryType) mustFilter.push({ key: "type", match: { value: query.memoryType } });
 
-        const results = await client.search(collectionName, {
-            vector,
-            limit: query.topK || 5,
-            filter: { must: mustFilter }
+            const results = await client.search(collectionName, {
+                vector,
+                limit: query.topK || 5,
+                filter: { must: mustFilter }
+            });
+
+            return results.map(hit => ({
+                id: hit.id,
+                score: hit.score,
+                content: hit.payload.content,
+                type: hit.payload.type,
+                timestamp: hit.payload.timestamp
+            }));
         });
 
-        return results.map(hit => ({
-            id: hit.id,
-            score: hit.score,
-            content: hit.payload.content,
-            type: hit.payload.type,
-            timestamp: hit.payload.timestamp
-        }));
-    });
-
-    return await Promise.all(queryPromises);
+        return await Promise.all(queryPromises);
+    } catch (error) {
+        // Fallback: return empty results when Qdrant is unavailable
+        console.warn(`Qdrant unavailable for batchQueryMemory: ${error.message}`);
+        return queries.map(() => []);
+    }
 }
 
 /**
@@ -820,7 +827,8 @@ async function storeCustomData(projectName, data, dataType, metadata = {}) {
             data: dataString,
             metadata: JSON.stringify(metadata),
             timestamp: new Date().toISOString(),
-            project: projectName
+            project: projectName,
+            customDataId: pointId
         }
     };
 
@@ -835,48 +843,20 @@ async function storeCustomData(projectName, data, dataType, metadata = {}) {
  * @returns {object|null} The custom data object or null if not found
  */
 async function getCustomData(projectName, dataId) {
-    const collectionName = `memory_bank_${projectName}`;
-
     try {
-        const results = await client.search(collectionName, {
-            vector: (await getEmbeddingProvider().embedTexts(["dummy"]))[0],
-            limit: 1,
-            filter: {
-                must: [
-                    { key: "project", match: { value: projectName } },
-                    { key: "type", match: { value: CUSTOM_DATA_TYPE } },
-                    { key: "id", match: { value: dataId } }
-                ]
-            }
-        });
+        // Use queryCustomData to get all custom data, then filter by ID
+        const allCustomData = await queryCustomData(projectName, null, {}, 100); // Get up to 100 items
 
-        if (results.length === 0) {
-            return null;
-        }
+        // Find the specific item by ID
+        const foundItem = allCustomData.find(item => item.id === dataId);
 
-        const hit = results[0];
-        let parsedData;
-        try {
-            parsedData = JSON.parse(hit.payload.data);
-        } catch (e) {
-            parsedData = hit.payload.data;
-        }
+        // Debug: log what we found
+        console.log(`getCustomData: looking for ${dataId}, found ${allCustomData.length} items, match: ${!!foundItem}`);
 
-        let parsedMetadata = {};
-        try {
-            parsedMetadata = JSON.parse(hit.payload.metadata);
-        } catch (e) {
-            // metadata might not be JSON
-        }
-
-        return {
-            id: hit.id,
-            dataType: hit.payload.dataType,
-            data: parsedData,
-            metadata: parsedMetadata,
-            timestamp: hit.payload.timestamp
-        };
+        return foundItem || null;
     } catch (error) {
+        // Fallback: return null when Qdrant is unavailable
+        console.warn(`Qdrant unavailable for getCustomData: ${error.message}`);
         return null;
     }
 }
@@ -1011,7 +991,8 @@ async function updateCustomData(projectName, dataId, newData, newMetadata = {}) 
             data: dataString,
             metadata: JSON.stringify(newMetadata),
             timestamp: new Date().toISOString(),
-            project: projectName
+            project: projectName,
+            customDataId: dataId
         }
     };
 
@@ -1026,44 +1007,65 @@ async function updateCustomData(projectName, dataId, newData, newMetadata = {}) 
  * @returns {object} Initialization result with detected workspace structure
  */
 async function initializeWorkspace(projectName, workspaceInfo = {}) {
-    const collectionName = await initMemoryBank(projectName);
+    try {
+        const collectionName = await initMemoryBank(projectName);
 
-    // Detect workspace structure
-    const workspaceStructure = {
-        projectName,
-        detectedFiles: workspaceInfo.files || [],
-        detectedDirectories: workspaceInfo.directories || [],
-        language: detectProjectLanguage(workspaceInfo),
-        framework: detectFramework(workspaceInfo),
-        timestamp: new Date().toISOString()
-    };
-
-    // Store workspace detection result
-    const workspaceData = JSON.stringify(workspaceStructure);
-    const vector = (await getEmbeddingProvider().embedTexts([workspaceData]))[0];
-
-    const pointId = uuidv4();
-    const point = {
-        id: pointId,
-        vector,
-        payload: {
-            type: "workspaceInit",
-            content: workspaceData,
-            project: projectName,
+        // Detect workspace structure
+        const workspaceStructure = {
+            projectName,
+            detectedFiles: workspaceInfo.files || [],
+            detectedDirectories: workspaceInfo.directories || [],
+            language: detectProjectLanguage(workspaceInfo),
+            framework: detectFramework(workspaceInfo),
             timestamp: new Date().toISOString()
-        }
-    };
+        };
 
-    await client.upsert(collectionName, { points: [point] });
+        // Store workspace detection result
+        const workspaceData = JSON.stringify(workspaceStructure);
+        const vector = (await getEmbeddingProvider().embedTexts([workspaceData]))[0];
 
-    // Initialize basic memory contexts if they don't exist
-    await initializeBasicContexts(projectName);
+        const pointId = uuidv4();
+        const point = {
+            id: pointId,
+            vector,
+            payload: {
+                type: "workspaceInit",
+                content: workspaceData,
+                project: projectName,
+                timestamp: new Date().toISOString()
+            }
+        };
 
-    return {
-        workspaceId: pointId,
-        structure: workspaceStructure,
-        initialized: true
-    };
+        await client.upsert(collectionName, { points: [point] });
+
+        // Initialize basic memory contexts if they don't exist
+        await initializeBasicContexts(projectName);
+
+        return {
+            workspaceId: pointId,
+            structure: workspaceStructure,
+            initialized: true
+        };
+    } catch (error) {
+        // Fallback: return workspace structure without storing when Qdrant is unavailable
+        console.warn(`Qdrant unavailable for initializeWorkspace: ${error.message}`);
+
+        const workspaceStructure = {
+            projectName,
+            detectedFiles: workspaceInfo.files || [],
+            detectedDirectories: workspaceInfo.directories || [],
+            language: detectProjectLanguage(workspaceInfo),
+            framework: detectFramework(workspaceInfo),
+            timestamp: new Date().toISOString()
+        };
+
+        return {
+            workspaceId: null,
+            structure: workspaceStructure,
+            initialized: false,
+            error: "Qdrant unavailable"
+        };
+    }
 }
 
 /**
@@ -1250,30 +1252,45 @@ async function syncFromSource(projectName, source) {
  * @returns {string} Markdown formatted export
  */
 async function exportMemoryToMarkdown(projectName, memoryTypes = null) {
-    const exportData = {
-        projectName,
-        exportDate: new Date().toISOString(),
-        sections: {}
-    };
+    try {
+        const exportData = {
+            projectName,
+            exportDate: new Date().toISOString(),
+            sections: {}
+        };
 
-    const typesToExport = memoryTypes || ['productContext', 'activeContext', 'systemPatterns', 'decisionLog', 'progress'];
+        const typesToExport = memoryTypes || ['productContext', 'activeContext', 'systemPatterns', 'decisionLog', 'progress'];
 
-    for (const type of typesToExport) {
-        if (STRUCTURED_CONTEXT_TYPES.includes(type)) {
-            const context = await getStructuredContext(projectName, type);
-            exportData.sections[type] = context;
-        } else {
-            // For non-structured types, get recent entries
-            const results = await queryMemory(projectName, type, type, 50);
-            exportData.sections[type] = results.map(r => ({
-                content: r.content,
-                timestamp: r.timestamp
-            }));
+        for (const type of typesToExport) {
+            if (STRUCTURED_CONTEXT_TYPES.includes(type)) {
+                const context = await getStructuredContext(projectName, type);
+                exportData.sections[type] = context;
+            } else {
+                // For non-structured types, get recent entries
+                const results = await queryMemory(projectName, type, type, 50);
+                exportData.sections[type] = results.map(r => ({
+                    content: r.content,
+                    timestamp: r.timestamp
+                }));
+            }
         }
-    }
 
-    // Convert to markdown
-    return convertToMarkdown(exportData);
+        // Convert to markdown
+        return convertToMarkdown(exportData);
+    } catch (error) {
+        // Fallback: return basic markdown when Qdrant is unavailable
+        console.warn(`Qdrant unavailable for exportMemoryToMarkdown: ${error.message}`);
+
+        const exportData = {
+            projectName,
+            exportDate: new Date().toISOString(),
+            sections: {
+                error: "Qdrant database unavailable for export"
+            }
+        };
+
+        return convertToMarkdown(exportData);
+    }
 }
 
 /**
