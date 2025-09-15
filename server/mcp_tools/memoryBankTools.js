@@ -14,15 +14,19 @@ const client = new QdrantClient({
     url: config.QDRANT_URL
 });
 
-// Lazy load embedding provider
+// Lazy load embedding provider - correct priority: Gemini > Ollama > FastEmbed
+// OPENROUTER_API_KEY only affects summarization, not embeddings
 let embeddingProvider;
 function getEmbeddingProvider() {
     if (!embeddingProvider) {
-        if (config.OPENROUTER_API_KEY) {
-            embeddingProvider = new OllamaProvider();
-        } else if (config.GEMINI_API_KEY) {
+        if (config.GEMINI_API_KEY) {
+            console.log("Using Gemini for embeddings");
             embeddingProvider = new GeminiVertexProvider();
+        } else if (config.OLLAMA_BASE_URL) {
+            console.log("Using Ollama for embeddings");
+            embeddingProvider = new OllamaProvider();
         } else {
+            console.log("Using FastEmbed (no embedding provider configured)");
             embeddingProvider = new FastEmbedProvider();
         }
     }

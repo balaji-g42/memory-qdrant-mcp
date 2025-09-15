@@ -12,9 +12,10 @@ class GeminiVertexProvider extends EmbeddingProviderBase {
     async embedTexts(texts) {
         const results = [];
         for (const txt of texts) {
+            const processedText = await this.preprocessText(txt);
             const res = await this.genAI.embedContent({
                 model: "models/text-embedding-004",
-                content: { parts: [{ text: txt }] }
+                content: { parts: [{ text: processedText }] }
             });
             results.push(res.embedding.values);
         }
