@@ -38,7 +38,7 @@ async function summarizeText(text) {
             const summary = response.data?.choices?.[0]?.message?.content;
             if (summary) return summary;
         } catch (err) {
-            console.error("OpenRouter summarization failed, falling back to Gemini:", err.message);
+            // OpenRouter summarization failed, falling back to Gemini
         }
     }
 
@@ -56,7 +56,7 @@ async function summarizeText(text) {
 
         if (summary) return summary;
     } catch (err) {
-        console.error("Gemini summarization failed:", err.message);
+        // Gemini summarization failed
     }
 
     // If all fails, return original text

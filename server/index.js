@@ -813,30 +813,16 @@ server.tool(
 );
 
 async function main() {
-    console.error("Starting Memory MCP server...");
     const transport = new StdioServerTransport();
 
     // Add error handling and logging for connection
     try {
         await server.connect(transport);
-        console.error("Memory MCP server connected successfully on stdio");
-
-        // Log when we receive messages
-        process.stdin.on('data', (data) => {
-            console.error("Received data from client:", data.toString().substring(0, 100) + "...");
-        });
-
-        process.stdin.on('end', () => {
-            console.error("Client disconnected");
-        });
-
     } catch (error) {
-        console.error("Failed to connect MCP server:", error);
         process.exit(1);
     }
 }
 
 main().catch((error) => {
-    console.error("Fatal error in main():", error);
     process.exit(1);
 });

@@ -20,13 +20,10 @@ let embeddingProvider;
 function getEmbeddingProvider() {
     if (!embeddingProvider) {
         if (config.GEMINI_API_KEY) {
-            console.log("Using Gemini for embeddings");
             embeddingProvider = new GeminiVertexProvider();
         } else if (config.OLLAMA_BASE_URL) {
-            console.log("Using Ollama for embeddings");
             embeddingProvider = new OllamaProvider();
         } else {
-            console.log("Using FastEmbed (no embedding provider configured)");
             embeddingProvider = new FastEmbedProvider();
         }
     }
@@ -200,7 +197,7 @@ async function getStructuredContext(projectName, contextType) {
 
     // Get the most recent entry for this context type
     const results = await client.search(collectionName, {
-        vector: (await getCachedEmbeddings(["dummy"]))[0], // dummy vector for filter-only query
+        vector: (await getCachedEmbeddings([`context type: ${contextType}`]))[0], // meaningful vector for context type
         limit: 1,
         filter: {
             must: [
@@ -552,7 +549,6 @@ async function batchQueryMemory(projectName, queries) {
         return await Promise.all(queryPromises);
     } catch (error) {
         // Fallback: return empty results when Qdrant is unavailable
-        console.warn(`Qdrant unavailable for batchQueryMemory: ${error.message}`);
         return queries.map(() => []);
     }
 }
@@ -854,13 +850,11 @@ async function getCustomData(projectName, dataId) {
         // Find the specific item by ID
         const foundItem = allCustomData.find(item => item.id === dataId);
 
-        // Debug: log what we found
-        console.log(`getCustomData: looking for ${dataId}, found ${allCustomData.length} items, match: ${!!foundItem}`);
+        // Debug: check what we found
 
         return foundItem || null;
     } catch (error) {
         // Fallback: return null when Qdrant is unavailable
-        console.warn(`Qdrant unavailable for getCustomData: ${error.message}`);
         return null;
     }
 }
@@ -1052,8 +1046,6 @@ async function initializeWorkspace(projectName, workspaceInfo = {}) {
         };
     } catch (error) {
         // Fallback: return workspace structure without storing when Qdrant is unavailable
-        console.warn(`Qdrant unavailable for initializeWorkspace: ${error.message}`);
-
         const workspaceStructure = {
             projectName,
             detectedFiles: workspaceInfo.files || [],
@@ -1283,8 +1275,6 @@ async function exportMemoryToMarkdown(projectName, memoryTypes = null) {
         return convertToMarkdown(exportData);
     } catch (error) {
         // Fallback: return basic markdown when Qdrant is unavailable
-        console.warn(`Qdrant unavailable for exportMemoryToMarkdown: ${error.message}`);
-
         const exportData = {
             projectName,
             exportDate: new Date().toISOString(),

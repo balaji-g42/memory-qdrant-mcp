@@ -26,8 +26,6 @@ async function initMemoryBank(projectName) {
             vectors: { size: config.VECTOR_DIM, distance: DISTANCE_MAP[config.DISTANCE_METRIC] || "Cosine" }
         });
 
-        console.log(`Memory Bank collection '${collectionName}' created.`);
-
         // Insert placeholder points for each memory type
         const points = MEMORY_TYPES.map(memType => ({
             id: uuidv4(),
@@ -41,9 +39,6 @@ async function initMemoryBank(projectName) {
         }));
 
         await client.upsert(collectionName, { points });
-        console.log(`Inserted placeholder points for memory types: ${MEMORY_TYPES.join(", ")}`);
-    } else {
-        console.log(`Memory Bank collection '${collectionName}' already exists.`);
     }
 
     return collectionName;
