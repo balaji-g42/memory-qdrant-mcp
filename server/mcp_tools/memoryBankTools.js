@@ -9,10 +9,9 @@ import FastEmbedProvider from "../embeddings/fastEmbed.js";
 import OllamaProvider from "../embeddings/ollama.js";
 import GeminiVertexProvider from "../embeddings/geminiVertex.js";
 
-// Initialize Qdrant client with connection pooling for better performance
+// Initialize Qdrant client
 const client = new QdrantClient({
-    url: config.QDRANT_URL,
-    pool_size: config.QDRANT_POOL_SIZE
+    url: config.QDRANT_URL
 });
 
 // Lazy load embedding provider
