@@ -15,6 +15,7 @@ import {
     updateProductContext,
     getActiveContext,
     updateActiveContext,
+    logDecisionStructured,
     getDecisionsStructured,
     searchDecisionsFTSStructured,
     semanticSearchStructured,
@@ -34,7 +35,12 @@ import {
     getCustomDataStructured,
     queryCustomDataStructured,
     searchCustomDataStructured,
-    updateCustomDataStructured
+    updateCustomDataStructured,
+    initializeWorkspaceStructured,
+    syncMemoryStructured,
+    exportMemoryToMarkdownStructured,
+    importMemoryFromMarkdownStructured,
+    analyzeConversationStructured
 } from "./mcp_tools/contextTools.js";
 
 // Create server instance
