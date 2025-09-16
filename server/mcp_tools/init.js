@@ -3,7 +3,7 @@ import { QdrantClient } from "@qdrant/js-client-rest";
 import { v4 as uuidv4 } from "uuid";
 import config from "../config.js";
 
-const MEMORY_TYPES = ["productContext", "activeContext", "systemPatterns", "decisionLog", "progress"];
+const MEMORY_TYPES = ["productContext", "activeContext", "systemPatterns", "decisionLog", "progress", "contextHistory", "customData"];
 
 // Map string to Qdrant distance
 const DISTANCE_MAP = {

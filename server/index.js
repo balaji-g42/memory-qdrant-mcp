@@ -400,7 +400,7 @@ server.tool(
     {
         project_name: z.string().describe("Name of the project"),
         entries: z.array(z.object({
-            memoryType: z.enum(["productContext", "activeContext", "systemPatterns", "decisionLog", "progress"]).describe("Type of memory"),
+            memoryType: z.enum(["productContext", "activeContext", "systemPatterns", "decisionLog", "progress", "contextHistory", "customData"]).describe("Type of memory"),
             content: z.string().describe("Content to log"),
             topLevelId: z.string().optional().describe("Optional custom ID for the entry")
         })).describe("Array of memory entries to log")

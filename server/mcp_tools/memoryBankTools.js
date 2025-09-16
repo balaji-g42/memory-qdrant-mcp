@@ -69,7 +69,7 @@ async function getCachedEmbeddings(texts) {
     return results;
 }
 
-const MEMORY_TYPES = ["productContext", "activeContext", "systemPatterns", "decisionLog", "progress", "contextHistory"];
+const MEMORY_TYPES = ["productContext", "activeContext", "systemPatterns", "decisionLog", "progress", "contextHistory", "customData"];
 
 // ConPort structured context types
 const STRUCTURED_CONTEXT_TYPES = ["productContext", "activeContext"];
