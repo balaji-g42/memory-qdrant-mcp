@@ -14,22 +14,48 @@ class OllamaProvider extends EmbeddingProviderBase {
 
         for (const text of texts) {
             try {
-                // Preprocess text (summarize if too long)
                 const processedText = await this.preprocessText(text);
-                // Truncate text if still too long to avoid issues
-                const truncatedText = processedText.length > 8000 ? processedText.substring(0, 8000) : processedText;
 
-                const response = await axios.post(`${this.baseURL}/api/embeddings`, {
-                    model: this.model,
-                    prompt: truncatedText
-                }, {
-                    timeout: 30000 // 30 second timeout
-                });
+                // Handle chunked text (array of strings)
+                if (Array.isArray(processedText)) {
+                    const chunkEmbeddings = [];
+                    for (const chunk of processedText) {
+                        // Truncate chunk if still too long
+                        const truncatedChunk = chunk.length > 8000 ? chunk.substring(0, 8000) : chunk;
 
-                if (response.data && response.data.embedding) {
-                    embeddings.push(response.data.embedding);
+                        const response = await axios.post(`${this.baseURL}/api/embeddings`, {
+                            model: this.model,
+                            prompt: truncatedChunk
+                        }, {
+                            timeout: 30000 // 30 second timeout
+                        });
+
+                        if (response.data && response.data.embedding) {
+                            chunkEmbeddings.push(response.data.embedding);
+                        } else {
+                            throw new Error("Invalid response format from Ollama API");
+                        }
+                    }
+                    // Average the chunk embeddings
+                    const avgEmbedding = this.averageEmbeddings(chunkEmbeddings);
+                    embeddings.push(avgEmbedding);
                 } else {
-                    throw new Error("Invalid response format from Ollama API");
+                    // Handle single text (string)
+                    // Truncate text if still too long to avoid issues
+                    const truncatedText = processedText.length > 8000 ? processedText.substring(0, 8000) : processedText;
+
+                    const response = await axios.post(`${this.baseURL}/api/embeddings`, {
+                        model: this.model,
+                        prompt: truncatedText
+                    }, {
+                        timeout: 30000 // 30 second timeout
+                    });
+
+                    if (response.data && response.data.embedding) {
+                        embeddings.push(response.data.embedding);
+                    } else {
+                        throw new Error("Invalid response format from Ollama API");
+                    }
                 }
             } catch (error) {
                 console.error(`Ollama embedding failed for text: ${error.message}`);
@@ -39,6 +65,28 @@ class OllamaProvider extends EmbeddingProviderBase {
         }
 
         return embeddings;
+    }
+
+    // Helper method to average multiple embeddings
+    averageEmbeddings(embeddings) {
+        if (embeddings.length === 0) return [];
+        if (embeddings.length === 1) return embeddings[0];
+
+        const embeddingLength = embeddings[0].length;
+        const averaged = new Array(embeddingLength).fill(0);
+
+        for (const embedding of embeddings) {
+            for (let i = 0; i < embeddingLength; i++) {
+                averaged[i] += embedding[i];
+            }
+        }
+
+        // Divide by number of embeddings to get average
+        for (let i = 0; i < embeddingLength; i++) {
+            averaged[i] /= embeddings.length;
+        }
+
+        return averaged;
     }
 
     providerName() {

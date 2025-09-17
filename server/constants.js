@@ -13,5 +13,11 @@ Guidelines:
 
 Text to summarize:`;
 
-export const MAX_TEXT_LENGTH_FOR_EMBEDDING = 5000; // Characters before summarization
+// Chunking configuration for embedding providers
+export const MAX_CHUNK_SIZE = 1500; // Characters per chunk (well under 2048 token limit)
+export const CHUNK_OVERLAP = 200; // Characters of overlap between chunks
+export const MAX_CHUNKS_PER_TEXT = 10; // Maximum number of chunks to generate
+
+// Fallback configuration
+export const MAX_TEXT_LENGTH_FOR_EMBEDDING = 5000; // Characters before chunking/summarization
 export const MAX_SUMMARY_LENGTH = 1000; // Target summary length
