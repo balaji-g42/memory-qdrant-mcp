@@ -389,38 +389,51 @@ async function createKnowledgeLink(projectName, sourceId, targetId, linkType, de
 async function getKnowledgeLinks(projectName, entityId, linkType = null, direction = "both") {
     const collectionName = `memory_bank_${projectName}`;
 
-    // Build filter based on direction
-    const mustFilter = [{ key: "project", match: { value: projectName } }];
-    if (linkType) {
-        mustFilter.push({ key: "linkType", match: { value: linkType } });
-    }
+    try {
+        // First, check if collection exists and get basic knowledge links
+        const basicFilter = {
+            must: [
+                { key: "project", match: { value: projectName } },
+                { key: "type", match: { value: "knowledgeLink" } }
+            ]
+        };
 
-    let shouldFilter = [];
-    if (direction === "outgoing" || direction === "both") {
-        shouldFilter.push({ key: "sourceId", match: { value: entityId } });
-    }
-    if (direction === "incoming" || direction === "both") {
-        shouldFilter.push({ key: "targetId", match: { value: entityId } });
-    }
-
-    const results = await client.search(collectionName, {
-        vector: (await getEmbeddingProvider().embedTexts(["knowledge links"]))[0],
-        limit: 50,
-        filter: {
-            must: mustFilter,
-            should: shouldFilter,
-            minimum_should_match: 1
+        if (linkType) {
+            basicFilter.must.push({ key: "linkType", match: { value: linkType } });
         }
-    });
 
-    return results.map(hit => ({
-        id: hit.id,
-        sourceId: hit.payload.sourceId,
-        targetId: hit.payload.targetId,
-        linkType: hit.payload.linkType,
-        description: hit.payload.description,
-        timestamp: hit.payload.timestamp
-    }));
+        // Get all knowledge links first
+        const allLinks = await client.search(collectionName, {
+            vector: (await getEmbeddingProvider().embedTexts(["knowledge links"]))[0],
+            limit: 100, // Get more to filter client-side
+            filter: basicFilter
+        });
+
+        // Filter client-side based on entityId and direction
+        const filteredResults = allLinks.filter(hit => {
+            const payload = hit.payload;
+            if (direction === "outgoing" || direction === "both") {
+                if (payload.sourceId === entityId) return true;
+            }
+            if (direction === "incoming" || direction === "both") {
+                if (payload.targetId === entityId) return true;
+            }
+            return false;
+        });
+
+        return filteredResults.map(hit => ({
+            id: hit.id,
+            sourceId: hit.payload.sourceId,
+            targetId: hit.payload.targetId,
+            linkType: hit.payload.linkType,
+            description: hit.payload.description,
+            timestamp: hit.payload.timestamp
+        }));
+    } catch (error) {
+        // Fallback: return empty array on error
+        console.error("Error in getKnowledgeLinks:", error);
+        return [];
+    }
 }
 
 // ----- Get context history -----
