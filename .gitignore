@@ -94,6 +94,7 @@ Thumbs.db
 *~
 
 # IDE-specific rule files
+.roo/mcp.json
 .clinerules/byterover-rules.md
 .kilocode/rules/byterover-rules.md
 .roo/rules/byterover-rules.md
