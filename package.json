@@ -7,7 +7,8 @@
     "memory-qdrant-mcp": "server/index.js"
   },
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "test:gemini": "node tests/test-gemini-error-handling.js"
   },
   "keywords": [
     "mcp",

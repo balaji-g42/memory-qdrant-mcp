@@ -10,6 +10,82 @@ import {
 import axios from "axios";
 import config from "../config.js";
 
+// Retry configuration for Gemini API
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  baseDelay: 1000, // 1 second
+  maxDelay: 5000,  // 5 seconds
+  backoffFactor: 2
+};
+
+// Error categorization for appropriate handling
+function categorizeGeminiError(error) {
+  const errorMessage = error.message.toLowerCase();
+
+  if (errorMessage.includes('api key') || errorMessage.includes('authentication') || errorMessage.includes('unauthorized')) {
+    return 'AUTHENTICATION_ERROR'; // No retry
+  }
+  if (errorMessage.includes('quota') || errorMessage.includes('limit') || errorMessage.includes('exceeded')) {
+    return 'QUOTA_ERROR'; // No retry
+  }
+  if (errorMessage.includes('timeout') || errorMessage.includes('network') || errorMessage.includes('fetch')) {
+    return 'NETWORK_ERROR'; // Retry with backoff
+  }
+  if (errorMessage.includes('rate limit') || errorMessage.includes('too many requests')) {
+    return 'RATE_LIMIT'; // Retry with longer delay
+  }
+
+  return 'UNKNOWN_ERROR'; // Retry once
+}
+
+// Retry utility with exponential backoff
+async function withRetry(operation, config = RETRY_CONFIG) {
+  let lastError;
+
+  for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+
+      // Check if error is retryable
+      const errorCategory = categorizeGeminiError(error);
+      if ((errorCategory === 'AUTHENTICATION_ERROR' || errorCategory === 'QUOTA_ERROR') || attempt === config.maxRetries) {
+        throw error;
+      }
+
+      // Calculate delay with exponential backoff
+      const delay = Math.min(
+        config.baseDelay * Math.pow(config.backoffFactor, attempt),
+        config.maxDelay
+      );
+
+      console.log(`Gemini API attempt ${attempt + 1} failed (${errorCategory}), retrying in ${delay}ms:`, error.message);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError;
+}
+
+// Enhanced Gemini API call with retry logic
+async function callGeminiAPI(text, prompt) {
+  return await withRetry(async () => {
+    const { GoogleGenerativeAI } = await import("google.generativeai");
+    if (!config.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not set");
+
+    const genai = new GoogleGenerativeAI(config.GEMINI_API_KEY);
+    const model = genai.getGenerativeModel({ model: "gemini-pro" });
+
+    const result = await model.generateContent(`${prompt}\n\nText to summarize:\n${text}`);
+    const response = await result.response;
+    const summary = response.text();
+
+    if (summary) return summary;
+    throw new Error("Empty response from Gemini API");
+  });
+}
+
 class EmbeddingProviderBase {
     async embedTexts(texts) {
         throw new Error("embedTexts() must be implemented by subclass");
@@ -116,21 +192,46 @@ class EmbeddingProviderBase {
             }
         }
 
-        // Fallback to Gemini free model
+        // Fallback to Gemini with enhanced error handling and retry logic
         try {
-            const { GoogleGenerativeAI } = await import("google.generativeai");
-            if (!config.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not set");
+            const summary = await callGeminiAPI(text, SUMMARIZATION_PROMPT);
 
-            const genai = new GoogleGenerativeAI(config.GEMINI_API_KEY);
-            const model = genai.getGenerativeModel({ model: "gemini-pro" });
-
-            const result = await model.generateContent(`${SUMMARIZATION_PROMPT}\n\nText to summarize:\n${text}`);
-            const response = await result.response;
-            const summary = response.text();
-
-            if (summary) return summary;
+            // Log successful summarization
+            console.log(`Gemini summarization successful in embedding preprocessing: ${text.length} chars -> ${summary.length} chars`);
+            return summary;
         } catch (err) {
-            console.error("Gemini summarization failed:", err.message);
+            const errorCategory = categorizeGeminiError(err);
+
+            // Structured error logging
+            const errorInfo = {
+                timestamp: new Date().toISOString(),
+                operation: 'embedding_preprocessing',
+                errorType: errorCategory,
+                errorMessage: err.message,
+                textLength: text.length,
+                hasApiKey: !!config.GEMINI_API_KEY,
+                fallbackProvider: "FastEmbed"
+            };
+
+            console.error('Gemini summarization failed in embedding preprocessing:', errorInfo);
+
+            // Log to memory system for pattern analysis
+            try {
+                if (typeof log_memory !== 'undefined') {
+                    log_memory({
+                        project_name: "memory-qdrant-mcp",
+                        memory_type: "systemPatterns",
+                        content: `Gemini Embedding Preprocessing Error: ${errorCategory} - ${err.message}`
+                    });
+                }
+            } catch (memoryErr) {
+                console.error('Failed to log to memory:', memoryErr.message);
+            }
+
+            // For certain error types, we could implement circuit breaker pattern here
+            if (errorCategory === 'AUTHENTICATION_ERROR' || errorCategory === 'QUOTA_ERROR') {
+                console.error(`Gemini API permanently unavailable due to ${errorCategory}. FastEmbed will be used for embeddings.`);
+            }
         }
 
         // If all fails, return original text
