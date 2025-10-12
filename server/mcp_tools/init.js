@@ -1,6 +1,7 @@
 // server/mcp_tools/init.js
 import { QdrantClient } from "@qdrant/js-client-rest";
 import { v4 as uuidv4 } from "uuid";
+import https from 'https';
 import config from "../config.js";
 
 const MEMORY_TYPES = ["productContext", "activeContext", "systemPatterns", "decisionLog", "progress", "contextHistory", "customData"];
@@ -12,7 +13,12 @@ const DISTANCE_MAP = {
     Dot: "Dot",
 };
 
-const client = new QdrantClient({ url: config.QDRANT_URL, apiKey: config.QDRANT_API_KEY || undefined });
+const client = new QdrantClient({
+  url: config.QDRANT_URL,
+  port: 443,
+  apiKey: process.env.QDRANT_API_KEY || undefined,
+  checkCompatibility: false
+});
 
 async function initMemoryBank(projectName) {
     const collectionName = `memory_bank_${projectName}`;
