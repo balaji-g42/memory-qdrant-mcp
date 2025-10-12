@@ -1,6 +1,5 @@
-import { initMemoryBank } from "./init.js";
+import { initMemoryBank, client } from "./init.js";
 import { v4 as uuidv4 } from "uuid";
-import { QdrantClient } from "@qdrant/js-client-rest";
 import config from "../config.js";
 import { embeddingCache, queryCache, contextCache, patternCache, cacheKeys, cacheUtils } from "../cache.js";
 
@@ -9,10 +8,7 @@ import FastEmbedProvider from "../embeddings/fastEmbed.js";
 import OllamaProvider from "../embeddings/ollama.js";
 import GeminiVertexProvider from "../embeddings/geminiVertex.js";
 
-// Initialize Qdrant client
-const client = new QdrantClient({
-    url: config.QDRANT_URL
-});
+// Client imported from init.js
 
 // Lazy load embedding provider - correct priority: Gemini > Ollama > FastEmbed
 // OPENROUTER_API_KEY only affects summarization, not embeddings

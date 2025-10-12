@@ -1,5 +1,5 @@
 // server/qdrantClient.js
-import { QdrantClient, Distance } from "@qdrant/js-client-rest";
+import { client } from "./init.js";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -14,12 +14,6 @@ const DISTANCE_MAP = {
     Euclid: Distance.Euclid,
     Dot: Distance.Dot,
 };
-
-// Initialize Qdrant client
-export const client = new QdrantClient({
-    url: QDRANT_URL,
-    apiKey: QDRANT_API_KEY || undefined,
-});
 
 // Create collection if not exists
 export async function createCollectionIfNotExists(collectionName) {

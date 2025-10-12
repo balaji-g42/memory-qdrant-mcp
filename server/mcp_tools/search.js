@@ -1,10 +1,8 @@
 // server/mcp_tools/search.js
-import { QdrantClient } from "@qdrant/js-client-rest";
+import { client } from "./init.js";
 import { embedText } from "./embeddings.js"; // wrapper for Gemini / Ollama embeddings
 import { summarizeText } from "./summarizer.js"; // wrapper for Gemini/OpenRouter summarizer
-import config from "../config.js";
 
-const client = new QdrantClient({ url: config.QDRANT_URL });
 const DEFAULT_TOP_K = parseInt(process.env.DEFAULT_TOP_K_MEMORY_QUERY || "3");
 
 /**

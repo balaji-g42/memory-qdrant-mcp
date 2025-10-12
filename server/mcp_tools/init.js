@@ -12,7 +12,7 @@ const DISTANCE_MAP = {
     Dot: "Dot",
 };
 
-const client = new QdrantClient({ url: config.QDRANT_URL });
+const client = new QdrantClient({ url: config.QDRANT_URL, apiKey: config.QDRANT_API_KEY || undefined });
 
 async function initMemoryBank(projectName) {
     const collectionName = `memory_bank_${projectName}`;

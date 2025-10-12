@@ -5,6 +5,7 @@ const config = {
     GEMINI_API_KEY: process.env.GEMINI_API_KEY || "",
     OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || "",
     QDRANT_URL: process.env.QDRANT_URL || "http://localhost:6333",
+    QDRANT_API_KEY: process.env.QDRANT_API_KEY || null,
     // Performance optimization settings
     QDRANT_POOL_SIZE: parseInt(process.env.QDRANT_POOL_SIZE || "10"),
     CACHE_TTL_SECONDS: parseInt(process.env.CACHE_TTL_SECONDS || "300"), // 5 minutes default
