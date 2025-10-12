@@ -1,5 +1,5 @@
 // server/qdrantClient.js
-import { QdrantClient, Distance } from "qdrant-node";
+import { QdrantClient, Distance } from "@qdrant/js-client-rest";
 import dotenv from "dotenv";
 
 dotenv.config();
