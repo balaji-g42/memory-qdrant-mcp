@@ -59,8 +59,10 @@ class OllamaProvider extends EmbeddingProviderBase {
                 }
             } catch (error) {
                 console.error(`Ollama embedding failed for text: ${error.message}`);
-                // Fallback to random embedding if Ollama fails
-                embeddings.push(Array(768).fill(Math.random()));
+                // Fallback to normalized random embedding if Ollama fails
+                const fallback = Array.from({length: config.VECTOR_DIM}, () => Math.random() - 0.5);
+                const mag = Math.sqrt(fallback.reduce((s, v) => s + v * v, 0));
+                embeddings.push(fallback.map(v => v / mag));
             }
         }
 

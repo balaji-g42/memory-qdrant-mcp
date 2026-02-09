@@ -1,12 +1,10 @@
 // server/qdrantClient.js
 import { client } from "./init.js";
-import dotenv from "dotenv";
-
-dotenv.config();
+import config from "./config.js";
 
 const QDRANT_URL = process.env.QDRANT_URL || "http://localhost:6333";
 const QDRANT_API_KEY = process.env.QDRANT_API_KEY || null;
-const VECTOR_DIM = parseInt(process.env.VECTOR_DIM || "768");
+const VECTOR_DIM = parseInt(process.env.VECTOR_DIM || "3072");
 const DISTANCE_METRIC = process.env.DISTANCE_METRIC || "Cosine";
 
 const DISTANCE_MAP = {

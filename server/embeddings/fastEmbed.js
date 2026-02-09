@@ -1,4 +1,5 @@
 import EmbeddingProviderBase from "./providerBase.js";
+import config from "../config.js";
 
 // Local placeholder embeddings (for testing or small projects)
 class FastEmbedProvider extends EmbeddingProviderBase {
@@ -12,7 +13,7 @@ class FastEmbedProvider extends EmbeddingProviderBase {
                 // For chunked text, generate one embedding per chunk and average them
                 const chunkEmbeddings = [];
                 for (const chunk of processedText) {
-                    const vector = Array.from({length: 768}, () => Math.random() - 0.5);
+                    const vector = Array.from({length: config.VECTOR_DIM}, () => Math.random() - 0.5);
                     const magnitude = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
                     chunkEmbeddings.push(vector.map(val => val / magnitude));
                 }
@@ -21,7 +22,7 @@ class FastEmbedProvider extends EmbeddingProviderBase {
                 results.push(avgEmbedding);
             } else {
                 // Handle single text (string) - generate normalized random vector
-                const vector = Array.from({length: 768}, () => Math.random() - 0.5);
+                const vector = Array.from({length: config.VECTOR_DIM}, () => Math.random() - 0.5);
                 const magnitude = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
                 results.push(vector.map(val => val / magnitude));
             }

@@ -1,6 +1,6 @@
 const config = {
     PORT: process.env.PORT || 8000,
-    VECTOR_DIM: parseInt(process.env.VECTOR_DIM || "768"),
+    VECTOR_DIM: parseInt(process.env.VECTOR_DIM || "3072"),
     DISTANCE_METRIC: process.env.DISTANCE_METRIC || "Cosine",
     GEMINI_API_KEY: process.env.GEMINI_API_KEY || "",
     OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || "",

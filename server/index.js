@@ -43,6 +43,15 @@ import {
     analyzeConversationStructured
 } from "./mcp_tools/contextTools.js";
 
+// Log uncaught errors so startup failures are visible
+process.on("unhandledRejection", (reason) => {
+    console.error("UnhandledRejection:", reason);
+});
+process.on("uncaughtException", (err) => {
+    console.error("UncaughtException:", err);
+    process.exit(1);
+});
+
 // Create server instance
 const server = new McpServer({
     name: "memory-qdrant-mcp",
@@ -819,10 +828,12 @@ async function main() {
     try {
         await server.connect(transport);
     } catch (error) {
+        console.error("Error connecting server:", error && (error.stack || error));
         process.exit(1);
     }
 }
 
 main().catch((error) => {
+    console.error("Fatal error in main():", error && (error.stack || error));
     process.exit(1);
 });
