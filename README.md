@@ -107,7 +107,7 @@ node server/index.js
 
   **Model Configuration** (optional, defaults provided):
   ```env
-  EMBEDDING_MODEL=models/text-embedding-004     # Gemini default (use nomic-embed-text:v1.5 for Ollama)
+  EMBEDDING_MODEL=models/gemini-embedding-001  # Gemini embedding model (use nomic-embed-text:v1.5 for Ollama)
   SUMMARIZER_MODEL=openai/gpt-oss-20b:free      # OpenRouter default (auto-switches to Gemini if no OpenRouter key)
   DEFAULT_TOP_K_MEMORY_QUERY=3                  # Search result limit
   ```
@@ -139,7 +139,7 @@ Add the following configuration:
         "GEMINI_API_KEY": "your_gemini_api_key_here",
         "OPENROUTER_API_KEY": "your_openrouter_api_key_here",
         "OLLAMA_BASE_URL": "http://localhost:11434",
-        "EMBEDDING_MODEL": "models/text-embedding-004",
+        "EMBEDDING_MODEL": "models/gemini-embedding-001",
         "DEFAULT_TOP_K_MEMORY_QUERY": "3",
         "SUMMARIZER_MODEL": "openai/gpt-oss-20b:free"
       }

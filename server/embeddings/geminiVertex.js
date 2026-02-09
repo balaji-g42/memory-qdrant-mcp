@@ -7,7 +7,8 @@ class GeminiVertexProvider extends EmbeddingProviderBase {
         super();
         if (!config.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not set in .env");
         this.genAI = new GoogleGenerativeAI(config.GEMINI_API_KEY);
-        this.embeddingModel = this.genAI.getGenerativeModel({ model: "text-embedding-004" });
+        const modelName = config.EMBEDDING_MODEL || "models/gemini-embedding-001";
+        this.embeddingModel = this.genAI.getGenerativeModel({ model: modelName });
     }
 
     async embedTexts(texts) {
