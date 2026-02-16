@@ -6,6 +6,11 @@ import "dotenv/config";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { createRequire } from "module";
+
+// Dynamically load package.json to get version
+const require = createRequire(import.meta.url);
+const packageJson = require("../package.json");
 
 import { logMemory, queryMemory } from "./mcp_tools/memoryBankTools.js";
 import { logDecision, logProgress } from "./mcp_tools/store.js";
@@ -55,7 +60,7 @@ process.on("uncaughtException", (err) => {
 // Create server instance
 const server = new McpServer({
     name: "memory-qdrant-mcp",
-    version: "1.0.0",
+    version: packageJson.version,
     capabilities: {
         tools: {},
     },
