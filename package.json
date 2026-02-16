@@ -6,6 +6,12 @@
   "bin": {
     "memory-qdrant-mcp": "dist/index.js"
   },
+  "files": [
+    "dist/",
+    "skill/",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",

@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "memory-qdrant-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "memory-qdrant-mcp"
+      ],
+      "env": {
+        "QDRANT_URL": "https://qdrant.geekscodebase.me",
+        "QDRANT_API_KEY": "your-qdrant-api-key-here",
+        "EMBEDDING_PROVIDER": "openrouter",
+        "EMBEDDING_MODEL": "qwen/qwen3-embedding-8b",
+        "SUMMARIZER_PROVIDER": "openrouter",
+        "SUMMARIZER_MODEL": "openai/gpt-oss-20b:free",
+        "OPENROUTER_API_KEY": "your-openrouter-api-key-here"
+      }
+    }
+  }
+}

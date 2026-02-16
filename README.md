@@ -196,6 +196,25 @@ Add to your Roo MCP settings:
 }
 ```
 
+## 🎯 Agent Skill
+
+A complete **Claude Agent Skill** is available in the [`skill/`](skill/) directory. This allows Claude to automatically use this MCP server's memory management capabilities when relevant.
+
+**What's included:**
+- ✅ Complete SKILL.md with YAML frontmatter and progressive disclosure architecture
+- ✅ Comprehensive API reference for all 35 tools  
+- ✅ Configuration guides for multiple platforms
+- ✅ Example workflows and best practices
+- ✅ MCP server configuration templates
+
+**Installation:**
+- **Claude.ai**: Zip and upload via Settings → Features → Skills
+- **Claude Code**: Copy to `.claude/skills/memory-qdrant-mcp/`
+- **Claude API**: Upload via Skills API endpoint
+- **Agent SDK**: Copy to `.claude/skills/` directory
+
+See [`skill/README.md`](skill/README.md) for detailed installation and usage instructions.
+
 ## 🛠️ Available Tools (35 total)
 
 ### Core Memory Operations (3 tools)

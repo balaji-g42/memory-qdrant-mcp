@@ -6,6 +6,9 @@ import "dotenv/config";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
 
 import { logMemory, queryMemory } from "./mcp_tools/memoryBankTools.js";
 import { logDecision, logProgress } from "./mcp_tools/store.js";
@@ -51,10 +54,17 @@ process.on("uncaughtException", (err) => {
     process.exit(1);
 });
 
+// Read package.json to get version
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageJson = JSON.parse(
+    readFileSync(join(__dirname, "..", "package.json"), "utf-8")
+);
+
 // Create McpServer instance
 const server = new McpServer({
     name: "memory-qdrant-mcp",
-    version: "2.0.0",
+    version: packageJson.version,
 });
 
 // Register all tools using McpServer.registerTool()
