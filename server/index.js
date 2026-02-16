@@ -67,7 +67,7 @@ const server = new McpServer({
 });
 
 // Register weather tools
-server.tool(
+server.registerTool(
     "log_memory",
     "Log a memory entry to the vector database",
     {
@@ -89,7 +89,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "query_memory",
     "Query memory entries from the vector database",
     {
@@ -111,7 +111,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "log_decision",
     "Log a decision entry",
     {
@@ -132,7 +132,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "log_progress",
     "Log a progress entry",
     {
@@ -153,7 +153,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "summarize_text",
     "Summarize the given text",
     {
@@ -172,7 +172,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "query_memory_summarized",
     "Query memory entries and return summarized results to reduce token usage",
     {
@@ -197,7 +197,7 @@ server.tool(
 );
 
 // ConPort-style structured context tools
-server.tool(
+server.registerTool(
     "get_product_context",
     "Get the product context for a project",
     {
@@ -216,7 +216,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "update_product_context",
     "Update the product context for a project",
     {
@@ -237,7 +237,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "get_active_context",
     "Get the active context for a project",
     {
@@ -256,7 +256,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "update_active_context",
     "Update the active context for a project",
     {
@@ -277,7 +277,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "get_decisions",
     "Get decisions for a project",
     {
@@ -299,7 +299,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "search_decisions_fts",
     "Search decisions using full-text search",
     {
@@ -320,7 +320,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "semantic_search",
     "Perform semantic search across all memory types using embeddings",
     {
@@ -342,7 +342,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "create_knowledge_link",
     "Create a knowledge link between two memory entities",
     {
@@ -365,7 +365,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "get_knowledge_links",
     "Get knowledge links for a specific entity",
     {
@@ -387,7 +387,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "get_context_history",
     "Get history of changes for a context type",
     {
@@ -408,7 +408,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "batch_log_memory",
     "Log multiple memory entries in a single operation",
     {
@@ -432,7 +432,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "batch_query_memory",
     "Perform multiple memory queries in a single operation",
     {
@@ -456,7 +456,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "batch_update_context",
     "Update multiple structured contexts in a single operation",
     {
@@ -479,7 +479,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "get_system_patterns",
     "Get system patterns and conventions for a project",
     {
@@ -499,7 +499,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "update_system_patterns",
     "Add or update system patterns and conventions for a project",
     {
@@ -519,7 +519,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "search_system_patterns",
     "Search system patterns using semantic search",
     {
@@ -540,7 +540,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "get_progress_with_status",
     "Get progress entries with status information",
     {
@@ -561,7 +561,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "update_progress_with_status",
     "Update progress with status tracking",
     {
@@ -584,7 +584,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "search_progress_entries",
     "Search progress entries using semantic search",
     {
@@ -606,7 +606,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "store_custom_data",
     "Store custom data with metadata",
     {
@@ -628,7 +628,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "get_custom_data",
     "Get custom data by ID",
     {
@@ -648,7 +648,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "query_custom_data",
     "Query custom data with filters",
     {
@@ -670,7 +670,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "search_custom_data",
     "Search custom data using semantic search",
     {
@@ -692,7 +692,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "update_custom_data",
     "Update existing custom data",
     {
@@ -714,7 +714,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "initialize_workspace",
     "Initialize workspace and detect project structure",
     {
@@ -737,7 +737,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "sync_memory",
     "Sync memory with external sources (proactive logging)",
     {
@@ -761,7 +761,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "export_memory_to_markdown",
     "Export memory data to markdown format",
     {
@@ -781,7 +781,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "import_memory_from_markdown",
     "Import memory data from markdown",
     {
@@ -801,7 +801,7 @@ server.tool(
     },
 );
 
-server.tool(
+server.registerTool(
     "analyze_conversation",
     "Analyze conversation and automatically log relevant information",
     {
