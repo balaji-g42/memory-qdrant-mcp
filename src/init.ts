@@ -1,26 +1,35 @@
-// server/mcp_tools/init.js
+// Qdrant client initialization and helper functions
 import { QdrantClient } from "@qdrant/js-client-rest";
 import { v4 as uuidv4 } from "uuid";
-import https from 'https';
-import config from "../config.js";
+import config from "./config.js";
+import type { MemoryType } from "./types.js";
 
-const MEMORY_TYPES = ["productContext", "activeContext", "systemPatterns", "decisionLog", "progress", "contextHistory", "customData"];
+const MEMORY_TYPES: MemoryType[] = [
+    "productContext", 
+    "activeContext", 
+    "systemPatterns", 
+    "decisionLog", 
+    "progress", 
+    "contextHistory", 
+    "customData"
+];
 
 // Map string to Qdrant distance
-const DISTANCE_MAP = {
+const DISTANCE_MAP: Record<string, string> = {
     Cosine: "Cosine",
     Euclid: "Euclid",
     Dot: "Dot",
 };
 
 const client = new QdrantClient({
-  url: config.QDRANT_URL,
-  port: 443,
-  apiKey: process.env.QDRANT_API_KEY || undefined,
-  checkCompatibility: false
+    url: config.QDRANT_URL,
+    port: 443,
+    apiKey: process.env.QDRANT_API_KEY || undefined,
+    // @ts-ignore - checkCompatibility may not be in the types but is valid
+    checkCompatibility: false
 });
 
-async function initMemoryBank(projectName) {
+async function initMemoryBank(projectName: string): Promise<string> {
     const collectionName = `memory_bank_${projectName}`;
 
     // Check if collection exists
@@ -29,7 +38,10 @@ async function initMemoryBank(projectName) {
 
     if (!exists) {
         await client.createCollection(collectionName, {
-            vectors: { size: config.VECTOR_DIM, distance: DISTANCE_MAP[config.DISTANCE_METRIC] || "Cosine" }
+            vectors: { 
+                size: config.VECTOR_DIM as number, 
+                distance: (DISTANCE_MAP[config.DISTANCE_METRIC] || "Cosine") as "Cosine"
+            }
         });
 
         // Insert placeholder points for each memory type

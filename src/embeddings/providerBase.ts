@@ -1,5 +1,4 @@
 // Base class for embedding providers
-import { summarizeText } from "../mcp_tools/summarizer.js";
 import {
     SUMMARIZATION_PROMPT,
     MAX_TEXT_LENGTH_FOR_EMBEDDING,
@@ -9,94 +8,90 @@ import {
 } from "../constants.js";
 import axios from "axios";
 import config from "../config.js";
+import type { RetryConfig, ErrorCategory } from "../types.js";
 
 // Retry configuration for Gemini API
-const RETRY_CONFIG = {
-  maxRetries: 3,
-  baseDelay: 1000, // 1 second
-  maxDelay: 5000,  // 5 seconds
-  backoffFactor: 2
+const RETRY_CONFIG: RetryConfig = {
+    maxRetries: 3,
+    baseDelay: 1000, // 1 second
+    maxDelay: 5000,  // 5 seconds
+    backoffFactor: 2
 };
 
 // Error categorization for appropriate handling
-function categorizeGeminiError(error) {
-  const errorMessage = error.message.toLowerCase();
+function categorizeGeminiError(error: Error): ErrorCategory {
+    const errorMessage = error.message.toLowerCase();
 
-  if (errorMessage.includes('api key') || errorMessage.includes('authentication') || errorMessage.includes('unauthorized')) {
-    return 'AUTHENTICATION_ERROR'; // No retry
-  }
-  if (errorMessage.includes('quota') || errorMessage.includes('limit') || errorMessage.includes('exceeded')) {
-    return 'QUOTA_ERROR'; // No retry
-  }
-  if (errorMessage.includes('timeout') || errorMessage.includes('network') || errorMessage.includes('fetch')) {
-    return 'NETWORK_ERROR'; // Retry with backoff
-  }
-  if (errorMessage.includes('rate limit') || errorMessage.includes('too many requests')) {
-    return 'RATE_LIMIT'; // Retry with longer delay
-  }
+    if (errorMessage.includes('api key') || errorMessage.includes('authentication') || errorMessage.includes('unauthorized')) {
+        return 'AUTHENTICATION_ERROR'; // No retry
+    }
+    if (errorMessage.includes('quota') || errorMessage.includes('limit') || errorMessage.includes('exceeded')) {
+        return 'QUOTA_ERROR'; // No retry
+    }
+    if (errorMessage.includes('timeout') || errorMessage.includes('network') || errorMessage.includes('fetch')) {
+        return 'NETWORK_ERROR'; // Retry with backoff
+    }
+    if (errorMessage.includes('rate limit') || errorMessage.includes('too many requests')) {
+        return 'RATE_LIMIT'; // Retry with longer delay
+    }
 
-  return 'UNKNOWN_ERROR'; // Retry once
+    return 'UNKNOWN_ERROR'; // Retry once
 }
 
 // Retry utility with exponential backoff
-async function withRetry(operation, config = RETRY_CONFIG) {
-  let lastError;
+async function withRetry<T>(operation: () => Promise<T>, retryConfig: RetryConfig = RETRY_CONFIG): Promise<T> {
+    let lastError: Error | undefined;
 
-  for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
-    try {
-      return await operation();
-    } catch (error) {
-      lastError = error;
+    for (let attempt = 0; attempt <= retryConfig.maxRetries; attempt++) {
+        try {
+            return await operation();
+        } catch (error) {
+            lastError = error as Error;
 
-      // Check if error is retryable
-      const errorCategory = categorizeGeminiError(error);
-      if ((errorCategory === 'AUTHENTICATION_ERROR' || errorCategory === 'QUOTA_ERROR') || attempt === config.maxRetries) {
-        throw error;
-      }
+            // Check if error is retryable
+            const errorCategory = categorizeGeminiError(lastError);
+            if ((errorCategory === 'AUTHENTICATION_ERROR' || errorCategory === 'QUOTA_ERROR') || attempt === retryConfig.maxRetries) {
+                throw lastError;
+            }
 
-      // Calculate delay with exponential backoff
-      const delay = Math.min(
-        config.baseDelay * Math.pow(config.backoffFactor, attempt),
-        config.maxDelay
-      );
+            // Calculate delay with exponential backoff
+            const delay = Math.min(
+                retryConfig.baseDelay * Math.pow(retryConfig.backoffFactor, attempt),
+                retryConfig.maxDelay
+            );
 
-      console.log(`Gemini API attempt ${attempt + 1} failed (${errorCategory}), retrying in ${delay}ms:`, error.message);
-      await new Promise(resolve => setTimeout(resolve, delay));
+            console.error(`Gemini API attempt ${attempt + 1} failed (${errorCategory}), retrying in ${delay}ms:`, lastError.message);
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
     }
-  }
 
-  throw lastError;
+    throw lastError;
 }
 
 // Enhanced Gemini API call with retry logic
-async function callGeminiAPI(text, prompt) {
-  return await withRetry(async () => {
-    const { GoogleGenerativeAI } = await import("google.generativeai");
-    if (!config.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not set");
+async function callGeminiAPI(text: string, prompt: string): Promise<string> {
+    return await withRetry(async () => {
+        const { GoogleGenerativeAI } = await import("@google/generative-ai");
+        if (!config.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not set");
 
-    const genai = new GoogleGenerativeAI(config.GEMINI_API_KEY);
-    const model = genai.getGenerativeModel({ model: "gemini-pro" });
+        const genai = new GoogleGenerativeAI(config.GEMINI_API_KEY);
+        const model = genai.getGenerativeModel({ model: "gemini-pro" });
 
-    const result = await model.generateContent(`${prompt}\n\nText to summarize:\n${text}`);
-    const response = await result.response;
-    const summary = response.text();
+        const result = await model.generateContent(`${prompt}\n\nText to summarize:\n${text}`);
+        const response = await result.response;
+        const summary = response.text();
 
-    if (summary) return summary;
-    throw new Error("Empty response from Gemini API");
-  });
+        if (summary) return summary;
+        throw new Error("Empty response from Gemini API");
+    });
 }
 
-class EmbeddingProviderBase {
-    async embedTexts(texts) {
-        throw new Error("embedTexts() must be implemented by subclass");
-    }
-
-    providerName() {
-        throw new Error("providerName() must be implemented by subclass");
-    }
+abstract class EmbeddingProviderBase {
+    abstract embedTexts(texts: string[]): Promise<number[][]>;
+    abstract providerName(): string;
 
     // Helper method to preprocess text before embedding
-    async preprocessText(text) {
+    async preprocessText(text: string): Promise<string | string[]> {
         if (text.length > MAX_TEXT_LENGTH_FOR_EMBEDDING) {
             // Try chunking first
             const chunks = this.chunkText(text);
@@ -110,8 +105,8 @@ class EmbeddingProviderBase {
     }
 
     // Intelligent text chunking with sentence boundary detection
-    chunkText(text) {
-        const chunks = [];
+    chunkText(text: string): string[] {
+        const chunks: string[] = [];
         let start = 0;
 
         while (start < text.length && chunks.length < MAX_CHUNKS_PER_TEXT) {
@@ -159,7 +154,7 @@ class EmbeddingProviderBase {
     }
 
     // Embedding-specific summarization with custom prompt
-    async summarizeForEmbedding(text) {
+    async summarizeForEmbedding(text: string): Promise<string> {
         const SUMMARIZER_MODEL = process.env.SUMMARIZER_MODEL || "openai/gpt-oss-20b:free";
         const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || "";
 
@@ -188,7 +183,8 @@ class EmbeddingProviderBase {
                 const summary = response.data?.choices?.[0]?.message?.content;
                 if (summary) return summary;
             } catch (err) {
-                console.error("OpenRouter summarization failed, falling back to Gemini:", err.message);
+                const error = err as Error;
+                console.error("OpenRouter summarization failed, falling back to Gemini:", error.message);
             }
         }
 
@@ -197,36 +193,24 @@ class EmbeddingProviderBase {
             const summary = await callGeminiAPI(text, SUMMARIZATION_PROMPT);
 
             // Log successful summarization
-            console.log(`Gemini summarization successful in embedding preprocessing: ${text.length} chars -> ${summary.length} chars`);
+            console.error(`Gemini summarization successful in embedding preprocessing: ${text.length} chars -> ${summary.length} chars`);
             return summary;
         } catch (err) {
-            const errorCategory = categorizeGeminiError(err);
+            const error = err as Error;
+            const errorCategory = categorizeGeminiError(error);
 
             // Structured error logging
             const errorInfo = {
                 timestamp: new Date().toISOString(),
                 operation: 'embedding_preprocessing',
                 errorType: errorCategory,
-                errorMessage: err.message,
+                errorMessage: error.message,
                 textLength: text.length,
                 hasApiKey: !!config.GEMINI_API_KEY,
                 fallbackProvider: "FastEmbed"
             };
 
             console.error('Gemini summarization failed in embedding preprocessing:', errorInfo);
-
-            // Log to memory system for pattern analysis
-            try {
-                if (typeof log_memory !== 'undefined') {
-                    log_memory({
-                        project_name: "memory-qdrant-mcp",
-                        memory_type: "systemPatterns",
-                        content: `Gemini Embedding Preprocessing Error: ${errorCategory} - ${err.message}`
-                    });
-                }
-            } catch (memoryErr) {
-                console.error('Failed to log to memory:', memoryErr.message);
-            }
 
             // For certain error types, we could implement circuit breaker pattern here
             if (errorCategory === 'AUTHENTICATION_ERROR' || errorCategory === 'QUOTA_ERROR') {

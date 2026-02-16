@@ -1,16 +1,24 @@
 import EmbeddingProviderBase from "./providerBase.js";
 import config from "../config.js";
 import axios from "axios";
+import FastEmbedProvider from "./fastEmbed.js";
 
 class OllamaProvider extends EmbeddingProviderBase {
+    private baseURL: string;
+    private model: string;
+    private apiKey: string;
+    private fastEmbedFallback: FastEmbedProvider;
+
     constructor() {
         super();
-        this.baseURL = config.OLLAMA_BASE_URL || "http://localhost:11434";
+        this.baseURL = config.OLLAMA_API_URL;
         this.model = config.EMBEDDING_MODEL || "nomic-embed-text:v1.5";
+        this.apiKey = config.OLLAMA_API_KEY;
+        this.fastEmbedFallback = new FastEmbedProvider();
     }
 
-    async embedTexts(texts) {
-        const embeddings = [];
+    async embedTexts(texts: string[]): Promise<number[][]> {
+        const embeddings: number[][] = [];
 
         for (const text of texts) {
             try {
@@ -18,15 +26,17 @@ class OllamaProvider extends EmbeddingProviderBase {
 
                 // Handle chunked text (array of strings)
                 if (Array.isArray(processedText)) {
-                    const chunkEmbeddings = [];
+                    const chunkEmbeddings: number[][] = [];
                     for (const chunk of processedText) {
                         // Truncate chunk if still too long
                         const truncatedChunk = chunk.length > 8000 ? chunk.substring(0, 8000) : chunk;
 
+                        const headers = this.apiKey ? { "Authorization": `Bearer ${this.apiKey}` } : {};
                         const response = await axios.post(`${this.baseURL}/api/embeddings`, {
                             model: this.model,
                             prompt: truncatedChunk
                         }, {
+                            headers,
                             timeout: 30000 // 30 second timeout
                         });
 
@@ -44,10 +54,12 @@ class OllamaProvider extends EmbeddingProviderBase {
                     // Truncate text if still too long to avoid issues
                     const truncatedText = processedText.length > 8000 ? processedText.substring(0, 8000) : processedText;
 
+                    const headers = this.apiKey ? { "Authorization": `Bearer ${this.apiKey}` } : {};
                     const response = await axios.post(`${this.baseURL}/api/embeddings`, {
                         model: this.model,
                         prompt: truncatedText
                     }, {
+                        headers,
                         timeout: 30000 // 30 second timeout
                     });
 
@@ -58,11 +70,11 @@ class OllamaProvider extends EmbeddingProviderBase {
                     }
                 }
             } catch (error) {
-                console.error(`Ollama embedding failed for text: ${error.message}`);
-                // Fallback to normalized random embedding if Ollama fails
-                const fallback = Array.from({length: config.VECTOR_DIM}, () => Math.random() - 0.5);
-                const mag = Math.sqrt(fallback.reduce((s, v) => s + v * v, 0));
-                embeddings.push(fallback.map(v => v / mag));
+                const err = error as Error;
+                console.error(`Ollama embedding failed for text: ${err.message}, falling back to FastEmbed`);
+                // Fallback to FastEmbed if Ollama fails
+                const fallbackEmbeddings = await this.fastEmbedFallback.embedTexts([text]);
+                embeddings.push(fallbackEmbeddings[0]);
             }
         }
 
@@ -70,7 +82,7 @@ class OllamaProvider extends EmbeddingProviderBase {
     }
 
     // Helper method to average multiple embeddings
-    averageEmbeddings(embeddings) {
+    averageEmbeddings(embeddings: number[][]): number[] {
         if (embeddings.length === 0) return [];
         if (embeddings.length === 1) return embeddings[0];
 
@@ -91,7 +103,7 @@ class OllamaProvider extends EmbeddingProviderBase {
         return averaged;
     }
 
-    providerName() {
+    providerName(): string {
         return "OllamaProvider";
     }
 }

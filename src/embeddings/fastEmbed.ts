@@ -3,16 +3,16 @@ import config from "../config.js";
 
 // Local placeholder embeddings (for testing or small projects)
 class FastEmbedProvider extends EmbeddingProviderBase {
-    async embedTexts(texts) {
-        const results = [];
+    async embedTexts(texts: string[]): Promise<number[][]> {
+        const results: number[][] = [];
         for (const txt of texts) {
             const processedText = await this.preprocessText(txt);
 
             // Handle chunked text (array of strings)
             if (Array.isArray(processedText)) {
                 // For chunked text, generate one embedding per chunk and average them
-                const chunkEmbeddings = [];
-                for (const chunk of processedText) {
+                const chunkEmbeddings: number[][] = [];
+                for (const _chunk of processedText) {
                     const vector = Array.from({length: config.VECTOR_DIM}, () => Math.random() - 0.5);
                     const magnitude = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
                     chunkEmbeddings.push(vector.map(val => val / magnitude));
@@ -31,7 +31,7 @@ class FastEmbedProvider extends EmbeddingProviderBase {
     }
 
     // Helper method to average multiple embeddings
-    averageEmbeddings(embeddings) {
+    averageEmbeddings(embeddings: number[][]): number[] {
         if (embeddings.length === 0) return [];
         if (embeddings.length === 1) return embeddings[0];
 
@@ -52,7 +52,7 @@ class FastEmbedProvider extends EmbeddingProviderBase {
         return averaged;
     }
 
-    providerName() {
+    providerName(): string {
         return "FastEmbedProvider";
     }
 }

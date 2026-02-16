@@ -1,31 +1,37 @@
 import config from './config.js';
+import type { CacheItem } from './types.js';
 
 /**
  * Simple LRU Cache implementation for performance optimization
  */
-class LRUCache {
-    constructor(maxSize = 100) {
+class LRUCache<T = any> {
+    private maxSize: number;
+    private cache: Map<string, CacheItem<T>>;
+
+    constructor(maxSize: number = 100) {
         this.maxSize = maxSize;
         this.cache = new Map();
     }
 
-    get(key) {
+    get(key: string): T | null {
         if (!this.cache.has(key)) return null;
 
         // Move to end (most recently used)
-        const value = this.cache.get(key);
+        const item = this.cache.get(key)!;
         this.cache.delete(key);
-        this.cache.set(key, value);
-        return value;
+        this.cache.set(key, item);
+        return item.value;
     }
 
-    set(key, value, ttl = config.CACHE_TTL_SECONDS * 1000) {
+    set(key: string, value: T, ttl: number = config.CACHE_TTL_SECONDS * 1000): void {
         if (this.cache.has(key)) {
             this.cache.delete(key);
         } else if (this.cache.size >= this.maxSize) {
             // Remove least recently used
             const firstKey = this.cache.keys().next().value;
-            this.cache.delete(firstKey);
+            if (firstKey !== undefined) {
+                this.cache.delete(firstKey);
+            }
         }
 
         this.cache.set(key, {
@@ -34,10 +40,10 @@ class LRUCache {
         });
     }
 
-    has(key) {
+    has(key: string): boolean {
         if (!this.cache.has(key)) return false;
 
-        const item = this.cache.get(key);
+        const item = this.cache.get(key)!;
         if (Date.now() > item.expiry) {
             this.cache.delete(key);
             return false;
@@ -46,11 +52,11 @@ class LRUCache {
         return true;
     }
 
-    clear() {
+    clear(): void {
         this.cache.clear();
     }
 
-    size() {
+    size(): number {
         // Clean expired entries
         for (const [key, item] of this.cache.entries()) {
             if (Date.now() > item.expiry) {
@@ -59,26 +65,35 @@ class LRUCache {
         }
         return this.cache.size;
     }
+
+    getMaxSize(): number {
+        return this.maxSize;
+    }
+
+    // Expose cache for iteration (needed for invalidation)
+    getCache(): Map<string, CacheItem<T>> {
+        return this.cache;
+    }
 }
 
 // Global cache instances
-export const embeddingCache = new LRUCache(config.EMBEDDING_CACHE_SIZE);
-export const queryCache = new LRUCache(config.QUERY_CACHE_SIZE);
-export const contextCache = new LRUCache(100); // For structured contexts
-export const patternCache = new LRUCache(50); // For system patterns
+export const embeddingCache = new LRUCache<number[]>(config.EMBEDDING_CACHE_SIZE);
+export const queryCache = new LRUCache<any>(config.QUERY_CACHE_SIZE);
+export const contextCache = new LRUCache<any>(100); // For structured contexts
+export const patternCache = new LRUCache<any>(50); // For system patterns
 
 /**
  * Cache key generators for consistent caching
  */
 export const cacheKeys = {
-    embedding: (text) => `embed:${text.length}:${text.slice(0, 50)}`,
-    query: (projectName, queryText, memoryType, topK) =>
+    embedding: (text: string): string => `embed:${text.length}:${text.slice(0, 50)}`,
+    query: (projectName: string, queryText: string, memoryType: string | undefined, topK: number): string =>
         `query:${projectName}:${queryText.slice(0, 50)}:${memoryType || 'all'}:${topK}`,
-    structuredContext: (projectName, contextType) =>
+    structuredContext: (projectName: string, contextType: string): string =>
         `context:${projectName}:${contextType}`,
-    systemPatterns: (projectName) =>
+    systemPatterns: (projectName: string): string =>
         `patterns:${projectName}`,
-    decisions: (projectName, limit) =>
+    decisions: (projectName: string, limit: number): string =>
         `decisions:${projectName}:${limit}`
 };
 
@@ -89,7 +104,7 @@ export const cacheUtils = {
     /**
      * Get cached value with TTL check
      */
-    getCached: (cache, key) => {
+    getCached: <T>(cache: LRUCache<T>, key: string): T | null => {
         if (!cache.has(key)) return null;
         return cache.get(key);
     },
@@ -97,21 +112,21 @@ export const cacheUtils = {
     /**
      * Set cached value with TTL
      */
-    setCached: (cache, key, value, ttl) => {
+    setCached: <T>(cache: LRUCache<T>, key: string, value: T, ttl?: number): void => {
         cache.set(key, value, ttl);
     },
 
     /**
      * Invalidate cache patterns
      */
-    invalidateProjectCache: (projectName) => {
+    invalidateProjectCache: (projectName: string): void => {
         // Clear all caches related to this project
         const caches = [queryCache, contextCache, patternCache];
 
         caches.forEach(cache => {
-            for (const key of cache.cache.keys()) {
+            for (const key of cache.getCache().keys()) {
                 if (key.includes(`:${projectName}:`)) {
-                    cache.cache.delete(key);
+                    cache.getCache().delete(key);
                 }
             }
         });
@@ -123,19 +138,19 @@ export const cacheUtils = {
     getStats: () => ({
         embeddingCache: {
             size: embeddingCache.size(),
-            maxSize: embeddingCache.maxSize
+            maxSize: embeddingCache.getMaxSize()
         },
         queryCache: {
             size: queryCache.size(),
-            maxSize: queryCache.maxSize
+            maxSize: queryCache.getMaxSize()
         },
         contextCache: {
             size: contextCache.size(),
-            maxSize: contextCache.maxSize
+            maxSize: contextCache.getMaxSize()
         },
         patternCache: {
             size: patternCache.size(),
-            maxSize: patternCache.maxSize
+            maxSize: patternCache.getMaxSize()
         }
     })
 };

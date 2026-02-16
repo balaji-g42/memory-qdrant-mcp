@@ -1,23 +1,38 @@
-import { initMemoryBank, client } from "./init.js";
+import { initMemoryBank, client } from "../init.js";
 import { v4 as uuidv4 } from "uuid";
 import config from "../config.js";
 import { embeddingCache, queryCache, contextCache, patternCache, cacheKeys, cacheUtils } from "../cache.js";
+import type { 
+    MemoryType, 
+    BatchLogEntry, 
+    BatchQuery, 
+    BatchContextUpdate,
+    WorkspaceInfo,
+    SyncSource,
+    ConversationMetadata,
+    ProgressStatus,
+    Priority,
+    LinkDirection
+} from "../types.js";
 
 // Embedding providers
 import FastEmbedProvider from "../embeddings/fastEmbed.js";
 import OllamaProvider from "../embeddings/ollama.js";
 import GeminiVertexProvider from "../embeddings/geminiVertex.js";
 
-// Client imported from init.js
+// Type definitions for embedding provider
+interface EmbeddingProvider {
+    embedTexts(texts: string[]): Promise<number[][]>;
+}
 
 // Lazy load embedding provider - correct priority: Gemini > Ollama > FastEmbed
 // OPENROUTER_API_KEY only affects summarization, not embeddings
-let embeddingProvider;
-function getEmbeddingProvider() {
+let embeddingProvider: EmbeddingProvider | undefined;
+function getEmbeddingProvider(): EmbeddingProvider {
     if (!embeddingProvider) {
         if (config.GEMINI_API_KEY) {
             embeddingProvider = new GeminiVertexProvider();
-        } else if (config.OLLAMA_BASE_URL) {
+        } else if (process.env.OLLAMA_BASE_URL) {
             embeddingProvider = new OllamaProvider();
         } else {
             embeddingProvider = new FastEmbedProvider();
@@ -28,14 +43,14 @@ function getEmbeddingProvider() {
 
 /**
  * Cached embedding generation with performance optimization
- * @param {string[]} texts - Array of texts to embed
- * @returns {number[][]} Array of embeddings
+ * @param texts - Array of texts to embed
+ * @returns Array of embeddings
  */
-async function getCachedEmbeddings(texts) {
+async function getCachedEmbeddings(texts: string[]): Promise<number[][]> {
     const provider = getEmbeddingProvider();
-    const results = [];
-    const uncachedTexts = [];
-    const uncachedIndices = [];
+    const results: number[][] = [];
+    const uncachedTexts: string[] = [];
+    const uncachedIndices: number[] = [];
 
     // Check cache for each text
     texts.forEach((text, index) => {
@@ -65,17 +80,178 @@ async function getCachedEmbeddings(texts) {
     return results;
 }
 
-const MEMORY_TYPES = ["productContext", "activeContext", "systemPatterns", "decisionLog", "progress", "contextHistory", "customData"];
+const MEMORY_TYPES: MemoryType[] = ["productContext", "activeContext", "systemPatterns", "decisionLog", "progress", "contextHistory", "customData"];
 
-// ConPort structured context types
-const STRUCTURED_CONTEXT_TYPES = ["productContext", "activeContext"];
-const DECISION_TYPE = "decisionLog";
-const PROGRESS_TYPE = "progress";
-const SYSTEM_PATTERN_TYPE = "systemPatterns";
-const CUSTOM_DATA_TYPE = "customData";
+// Context structured context types
+const STRUCTURED_CONTEXT_TYPES: ("productContext" | "activeContext")[] = ["productContext", "activeContext"];
+const DECISION_TYPE: MemoryType = "decisionLog";
+const PROGRESS_TYPE: MemoryType = "progress";
+const SYSTEM_PATTERN_TYPE: MemoryType = "systemPatterns";
+const CUSTOM_DATA_TYPE: MemoryType = "customData";
+
+// Interface definitions for return types
+interface QueryResult {
+    id: string | number;
+    score: number;
+    content: string;
+    type: string;
+    timestamp: string;
+}
+
+interface DecisionResult {
+    id: string | number;
+    summary: string;
+    timestamp: string;
+}
+
+interface SemanticSearchResult {
+    id: string | number;
+    score: number;
+    content: string;
+    type: string;
+    timestamp: string;
+    structured: boolean;
+}
+
+interface KnowledgeLink {
+    id: string | number;
+    sourceId: string;
+    targetId: string;
+    linkType: string;
+    description: string;
+    timestamp: string;
+}
+
+interface ContextHistoryEntry {
+    id: string | number;
+    contextType: string;
+    previousVersion: any;
+    newVersion: any;
+    changes: Record<string, any>;
+    timestamp: string;
+    pointId: string;
+}
+
+interface ProgressEntry {
+    id: string | number;
+    content: string;
+    status: string;
+    category: string;
+    priority: string;
+    timestamp: string;
+}
+
+interface ProgressSearchResult extends ProgressEntry {
+    score: number;
+}
+
+interface SystemPattern {
+    id: string | number;
+    pattern: string;
+    timestamp: string;
+}
+
+interface SystemPatternSearchResult extends SystemPattern {
+    score: number;
+}
+
+interface CustomDataEntry {
+    id: string | number;
+    dataType: string;
+    data: any;
+    metadata: Record<string, any>;
+    timestamp: string;
+}
+
+interface CustomDataSearchResult extends CustomDataEntry {
+    score: number;
+}
+
+interface WorkspaceStructure {
+    projectName: string;
+    detectedFiles: string[];
+    detectedDirectories: string[];
+    language: string;
+    framework: string;
+    timestamp: string;
+}
+
+interface InitializationResult {
+    workspaceId: string | null;
+    structure: WorkspaceStructure;
+    initialized: boolean;
+    error?: string;
+}
+
+interface SyncSourceResult {
+    source: string;
+    entries: number;
+    success: boolean;
+}
+
+interface SyncResultError {
+    source: string;
+    error: string;
+}
+
+interface SyncResult {
+    timestamp: string;
+    sources: SyncSourceResult[];
+    totalEntries: number;
+    errors: SyncResultError[];
+}
+
+interface ExportData {
+    projectName: string;
+    exportDate: string;
+    sections: Record<string, any>;
+}
+
+interface ImportResult {
+    imported: number;
+    errors: string[];
+    timestamp: string;
+}
+
+interface AnalysisDecision {
+    content: string;
+    confidence: number;
+}
+
+interface AnalysisProgress {
+    content: string;
+    status: string;
+}
+
+interface AnalysisResults {
+    decisions: AnalysisDecision[];
+    progress: AnalysisProgress[];
+    questions: string[];
+    insights: string[];
+    timestamp: string;
+}
+
+interface CacheStats {
+    embeddingCache: {
+        size: number;
+        maxSize: number;
+    };
+    queryCache: {
+        size: number;
+        maxSize: number;
+    };
+    contextCache: {
+        size: number;
+        maxSize: number;
+    };
+    patternCache: {
+        size: number;
+        maxSize: number;
+    };
+}
 
 // ----- Log memory entry -----
-async function logMemory(projectName, memoryType, content, topLevelId = null) {
+async function logMemory(projectName: string, memoryType: MemoryType, content: string, topLevelId: string | null = null): Promise<string> {
     if (!MEMORY_TYPES.includes(memoryType)) {
         throw new Error(`Invalid memory type: ${memoryType}`);
     }
@@ -108,9 +284,9 @@ async function logMemory(projectName, memoryType, content, topLevelId = null) {
 }
 
 // ----- Query memory -----
-async function queryMemory(projectName, queryText, memoryType = null, topK = 5) {
+async function queryMemory(projectName: string, queryText: string, memoryType: string | null = null, topK: number = 5): Promise<QueryResult[]> {
     // Check cache first
-    const cacheKey = cacheKeys.query(projectName, queryText, memoryType, topK);
+    const cacheKey = cacheKeys.query(projectName, queryText, memoryType || undefined, topK);
     const cachedResult = cacheUtils.getCached(queryCache, cacheKey);
     if (cachedResult) {
         return cachedResult;
@@ -123,7 +299,7 @@ async function queryMemory(projectName, queryText, memoryType = null, topK = 5) 
     const vector = vectors[0];
 
     // Build filter
-    const mustFilter = [{ key: "project", match: { value: projectName } }];
+    const mustFilter: any[] = [{ key: "project", match: { value: projectName } }];
     if (memoryType) mustFilter.push({ key: "type", match: { value: memoryType } });
 
     const results = await client.search(collectionName, {
@@ -132,12 +308,12 @@ async function queryMemory(projectName, queryText, memoryType = null, topK = 5) 
         filter: { must: mustFilter }
     });
 
-    const formattedResults = results.map(hit => ({
+    const formattedResults: QueryResult[] = results.map((hit: any) => ({
         id: hit.id,
         score: hit.score,
-        content: hit.payload.content,
-        type: hit.payload.type,
-        timestamp: hit.payload.timestamp
+        content: hit.payload?.content,
+        type: hit.payload?.type,
+        timestamp: hit.payload?.timestamp
     }));
 
     // Cache the results
@@ -147,7 +323,7 @@ async function queryMemory(projectName, queryText, memoryType = null, topK = 5) 
 }
 
 // ----- Log structured memory entry (for ConPort contexts) -----
-async function logStructuredMemory(projectName, contextType, content, topLevelId = null) {
+async function logStructuredMemory(projectName: string, contextType: "productContext" | "activeContext", content: string | Record<string, any>, topLevelId: string | null = null): Promise<string> {
     if (!STRUCTURED_CONTEXT_TYPES.includes(contextType)) {
         throw new Error(`Invalid structured context type: ${contextType}`);
     }
@@ -177,7 +353,7 @@ async function logStructuredMemory(projectName, contextType, content, topLevelId
 }
 
 // ----- Get structured context -----
-async function getStructuredContext(projectName, contextType) {
+async function getStructuredContext(projectName: string, contextType: "productContext" | "activeContext"): Promise<Record<string, any>> {
     if (!STRUCTURED_CONTEXT_TYPES.includes(contextType)) {
         throw new Error(`Invalid structured context type: ${contextType}`);
     }
@@ -203,18 +379,18 @@ async function getStructuredContext(projectName, contextType) {
             ]
         },
         with_payload: true,
-        with_vectors: false
+        with_vector: false
     });
 
-    let contextResult;
+    let contextResult: Record<string, any>;
     if (results.length === 0) {
         contextResult = {}; // Return empty object if no context exists
     } else {
         const payload = results[0].payload;
         try {
-            contextResult = typeof payload.content === 'string' ? JSON.parse(payload.content) : payload.content;
+            contextResult = typeof payload?.content === 'string' ? JSON.parse(payload.content) : payload?.content;
         } catch (e) {
-            contextResult = payload.content; // Return as string if not valid JSON
+            contextResult = payload?.content || {}; // Return as string if not valid JSON
         }
     }
 
@@ -225,7 +401,7 @@ async function getStructuredContext(projectName, contextType) {
 }
 
 // ----- Update structured context with patch -----
-async function updateStructuredContext(projectName, contextType, patchContent) {
+async function updateStructuredContext(projectName: string, contextType: "productContext" | "activeContext", patchContent: Record<string, any>): Promise<string> {
     if (!STRUCTURED_CONTEXT_TYPES.includes(contextType)) {
         throw new Error(`Invalid structured context type: ${contextType}`);
     }
@@ -260,17 +436,17 @@ async function updateStructuredContext(projectName, contextType, patchContent) {
 
     // Invalidate context cache
     const cacheKey = cacheKeys.structuredContext(projectName, contextType);
-    contextCache.cache.delete(cacheKey);
+    contextCache.getCache().delete(cacheKey);
 
     return pointId;
 }
 
 // ----- Get decisions with structured format -----
-async function getDecisions(projectName, limit = 10, tags_filter_include_all = [], tags_filter_include_any = []) {
+async function getDecisions(projectName: string, limit: number = 10, _tags_filter_include_all: string[] = [], _tags_filter_include_any: string[] = []): Promise<DecisionResult[]> {
     const collectionName = `memory_bank_${projectName}`;
 
     // Build filter
-    const mustFilter = [
+    const mustFilter: any[] = [
         { key: "project", match: { value: projectName } },
         { key: "type", match: { value: DECISION_TYPE } }
     ];
@@ -282,15 +458,15 @@ async function getDecisions(projectName, limit = 10, tags_filter_include_all = [
         filter: { must: mustFilter }
     });
 
-    return results.map(hit => ({
+    return results.map((hit: any) => ({
         id: hit.id,
-        summary: hit.payload.content,
-        timestamp: hit.payload.timestamp
+        summary: hit.payload?.content,
+        timestamp: hit.payload?.timestamp
     }));
 }
 
 // ----- Search decisions with full-text search simulation -----
-async function searchDecisionsFTS(projectName, queryTerm, limit = 10) {
+async function searchDecisionsFTS(projectName: string, queryTerm: string, limit: number = 10): Promise<DecisionResult[]> {
     const collectionName = `memory_bank_${projectName}`;
 
     // Use semantic search with the query term
@@ -307,22 +483,22 @@ async function searchDecisionsFTS(projectName, queryTerm, limit = 10) {
         }
     });
 
-    return results.map(hit => ({
+    return results.map((hit: any) => ({
         id: hit.id,
-        summary: hit.payload.content,
+        summary: hit.payload?.content,
         score: hit.score,
-        timestamp: hit.payload.timestamp
+        timestamp: hit.payload?.timestamp
     }));
 }
 
 // ----- Semantic search across all memory types -----
-async function semanticSearch(projectName, queryText, limit = 10, memoryTypes = null) {
+async function semanticSearch(projectName: string, queryText: string, limit: number = 10, memoryTypes: string[] | null = null): Promise<SemanticSearchResult[]> {
     const collectionName = `memory_bank_${projectName}`;
 
     const vector = (await getEmbeddingProvider().embedTexts([queryText]))[0];
 
     // Build filter
-    const mustFilter = [{ key: "project", match: { value: projectName } }];
+    const mustFilter: any[] = [{ key: "project", match: { value: projectName } }];
     if (memoryTypes && memoryTypes.length > 0) {
         mustFilter.push({
             key: "type",
@@ -336,18 +512,18 @@ async function semanticSearch(projectName, queryText, limit = 10, memoryTypes = 
         filter: { must: mustFilter }
     });
 
-    return results.map(hit => ({
+    return results.map((hit: any) => ({
         id: hit.id,
         score: hit.score,
-        content: hit.payload.content,
-        type: hit.payload.type,
-        timestamp: hit.payload.timestamp,
-        structured: hit.payload.structured || false
+        content: hit.payload?.content,
+        type: hit.payload?.type,
+        timestamp: hit.payload?.timestamp,
+        structured: hit.payload?.structured || false
     }));
 }
 
 // ----- Knowledge graph linking -----
-async function createKnowledgeLink(projectName, sourceId, targetId, linkType, description = "") {
+async function createKnowledgeLink(projectName: string, sourceId: string, targetId: string, linkType: string, description: string = ""): Promise<string> {
     const collectionName = await initMemoryBank(projectName);
 
     const linkContent = {
@@ -382,12 +558,12 @@ async function createKnowledgeLink(projectName, sourceId, targetId, linkType, de
     return pointId;
 }
 
-async function getKnowledgeLinks(projectName, entityId, linkType = null, direction = "both") {
+async function getKnowledgeLinks(projectName: string, entityId: string, linkType: string | null = null, direction: LinkDirection = "both"): Promise<KnowledgeLink[]> {
     const collectionName = `memory_bank_${projectName}`;
 
     try {
         // First, check if collection exists and get basic knowledge links
-        const basicFilter = {
+        const basicFilter: any = {
             must: [
                 { key: "project", match: { value: projectName } },
                 { key: "type", match: { value: "knowledgeLink" } }
@@ -406,24 +582,24 @@ async function getKnowledgeLinks(projectName, entityId, linkType = null, directi
         });
 
         // Filter client-side based on entityId and direction
-        const filteredResults = allLinks.filter(hit => {
+        const filteredResults = allLinks.filter((hit: any) => {
             const payload = hit.payload;
             if (direction === "outgoing" || direction === "both") {
-                if (payload.sourceId === entityId) return true;
+                if (payload?.sourceId === entityId) return true;
             }
             if (direction === "incoming" || direction === "both") {
-                if (payload.targetId === entityId) return true;
+                if (payload?.targetId === entityId) return true;
             }
             return false;
         });
 
-        return filteredResults.map(hit => ({
+        return filteredResults.map((hit: any) => ({
             id: hit.id,
-            sourceId: hit.payload.sourceId,
-            targetId: hit.payload.targetId,
-            linkType: hit.payload.linkType,
-            description: hit.payload.description,
-            timestamp: hit.payload.timestamp
+            sourceId: hit.payload?.sourceId,
+            targetId: hit.payload?.targetId,
+            linkType: hit.payload?.linkType,
+            description: hit.payload?.description,
+            timestamp: hit.payload?.timestamp
         }));
     } catch (error) {
         // Fallback: return empty array on error
@@ -433,7 +609,7 @@ async function getKnowledgeLinks(projectName, entityId, linkType = null, directi
 }
 
 // ----- Get context history -----
-async function getContextHistory(projectName, contextType, limit = 10) {
+async function getContextHistory(projectName: string, contextType: "productContext" | "activeContext", limit: number = 10): Promise<ContextHistoryEntry[]> {
     if (!STRUCTURED_CONTEXT_TYPES.includes(contextType)) {
         throw new Error(`Invalid structured context type: ${contextType}`);
     }
@@ -452,9 +628,9 @@ async function getContextHistory(projectName, contextType, limit = 10) {
         }
     });
 
-    return results.map(hit => {
+    return results.map((hit: any) => {
         try {
-            const historyData = JSON.parse(hit.payload.content);
+            const historyData = JSON.parse(hit.payload?.content);
             return {
                 id: hit.id,
                 contextType: historyData.contextType,
@@ -467,24 +643,24 @@ async function getContextHistory(projectName, contextType, limit = 10) {
         } catch (e) {
             return null;
         }
-    }).filter(item => item !== null);
+    }).filter((item: any): item is ContextHistoryEntry => item !== null);
 }
 
 // ----- Batch operations -----
 
 /**
  * Batch log multiple memory entries
- * @param {string} projectName - Name of the project
- * @param {Array} entries - Array of {memoryType, content, topLevelId} objects
- * @returns {Array} Array of logged entry IDs
+ * @param projectName - Name of the project
+ * @param entries - Array of {memoryType, content, topLevelId} objects
+ * @returns Array of logged entry IDs
  */
-async function batchLogMemory(projectName, entries) {
+async function batchLogMemory(projectName: string, entries: BatchLogEntry[]): Promise<string[]> {
     if (!Array.isArray(entries) || entries.length === 0) {
         throw new Error("Entries must be a non-empty array");
     }
 
     const collectionName = await initMemoryBank(projectName);
-    const points = [];
+    const points: any[] = [];
 
     // Process all entries in parallel for embedding
     const embedPromises = entries.map(entry => {
@@ -518,11 +694,11 @@ async function batchLogMemory(projectName, entries) {
 
 /**
  * Batch query memory with multiple queries
- * @param {string} projectName - Name of the project
- * @param {Array} queries - Array of {queryText, memoryType, topK} objects
- * @returns {Array} Array of query results
+ * @param projectName - Name of the project
+ * @param queries - Array of {queryText, memoryType, topK} objects
+ * @returns Array of query results
  */
-async function batchQueryMemory(projectName, queries) {
+async function batchQueryMemory(projectName: string, queries: BatchQuery[]): Promise<QueryResult[][]> {
     if (!Array.isArray(queries) || queries.length === 0) {
         throw new Error("Queries must be a non-empty array");
     }
@@ -537,7 +713,7 @@ async function batchQueryMemory(projectName, queries) {
             const vector = vectors[0];
 
             // Build filter
-            const mustFilter = [{ key: "project", match: { value: projectName } }];
+            const mustFilter: any[] = [{ key: "project", match: { value: projectName } }];
             if (query.memoryType) mustFilter.push({ key: "type", match: { value: query.memoryType } });
 
             const results = await client.search(collectionName, {
@@ -546,12 +722,12 @@ async function batchQueryMemory(projectName, queries) {
                 filter: { must: mustFilter }
             });
 
-            return results.map(hit => ({
+            return results.map((hit: any) => ({
                 id: hit.id,
                 score: hit.score,
-                content: hit.payload.content,
-                type: hit.payload.type,
-                timestamp: hit.payload.timestamp
+                content: hit.payload?.content,
+                type: hit.payload?.type,
+                timestamp: hit.payload?.timestamp
             }));
         });
 
@@ -564,16 +740,16 @@ async function batchQueryMemory(projectName, queries) {
 
 /**
  * Batch update multiple structured contexts
- * @param {string} projectName - Name of the project
- * @param {Array} updates - Array of {contextType, patchContent} objects
- * @returns {Array} Array of update result IDs
+ * @param projectName - Name of the project
+ * @param updates - Array of {contextType, patchContent} objects
+ * @returns Array of update result IDs
  */
-async function batchUpdateStructuredContext(projectName, updates) {
+async function batchUpdateStructuredContext(projectName: string, updates: BatchContextUpdate[]): Promise<string[]> {
     if (!Array.isArray(updates) || updates.length === 0) {
         throw new Error("Updates must be a non-empty array");
     }
 
-    const results = [];
+    const results: string[] = [];
 
     // Process updates sequentially to avoid conflicts
     for (const update of updates) {
@@ -592,11 +768,11 @@ async function batchUpdateStructuredContext(projectName, updates) {
 
 /**
  * Get all system patterns for a project
- * @param {string} projectName - Name of the project
- * @param {number} limit - Maximum number of patterns to return
- * @returns {Array} Array of system patterns
+ * @param projectName - Name of the project
+ * @param limit - Maximum number of patterns to return
+ * @returns Array of system patterns
  */
-async function getSystemPatterns(projectName, limit = 50) {
+async function getSystemPatterns(projectName: string, limit: number = 50): Promise<SystemPattern[]> {
     // Check cache first
     const cacheKey = cacheKeys.systemPatterns(projectName);
     const cachedResult = cacheUtils.getCached(patternCache, cacheKey);
@@ -617,10 +793,10 @@ async function getSystemPatterns(projectName, limit = 50) {
         }
     });
 
-    const formattedResults = results.map(hit => ({
+    const formattedResults: SystemPattern[] = results.map((hit: any) => ({
         id: hit.id,
-        pattern: hit.payload.content,
-        timestamp: hit.payload.timestamp
+        pattern: hit.payload?.content,
+        timestamp: hit.payload?.timestamp
     }));
 
     // Cache the results
@@ -631,17 +807,17 @@ async function getSystemPatterns(projectName, limit = 50) {
 
 /**
  * Update or add system patterns
- * @param {string} projectName - Name of the project
- * @param {Array} patterns - Array of pattern strings to add/update
- * @returns {Array} Array of logged pattern IDs
+ * @param projectName - Name of the project
+ * @param patterns - Array of pattern strings to add/update
+ * @returns Array of logged pattern IDs
  */
-async function updateSystemPatterns(projectName, patterns) {
+async function updateSystemPatterns(projectName: string, patterns: string[]): Promise<string[]> {
     if (!Array.isArray(patterns) || patterns.length === 0) {
         throw new Error("Patterns must be a non-empty array");
     }
 
     const collectionName = await initMemoryBank(projectName);
-    const ids = [];
+    const ids: string[] = [];
 
     for (const pattern of patterns) {
         const vectors = await getCachedEmbeddings([pattern]);
@@ -665,19 +841,19 @@ async function updateSystemPatterns(projectName, patterns) {
 
     // Invalidate pattern cache
     const cacheKey = cacheKeys.systemPatterns(projectName);
-    patternCache.cache.delete(cacheKey);
+    patternCache.getCache().delete(cacheKey);
 
     return ids;
 }
 
 /**
  * Search system patterns using semantic search
- * @param {string} projectName - Name of the project
- * @param {string} queryText - Query for finding relevant patterns
- * @param {number} limit - Maximum number of results to return
- * @returns {Array} Array of matching patterns with scores
+ * @param projectName - Name of the project
+ * @param queryText - Query for finding relevant patterns
+ * @param limit - Maximum number of results to return
+ * @returns Array of matching patterns with scores
  */
-async function searchSystemPatterns(projectName, queryText, limit = 10) {
+async function searchSystemPatterns(projectName: string, queryText: string, limit: number = 10): Promise<SystemPatternSearchResult[]> {
     const collectionName = `memory_bank_${projectName}`;
 
     const vector = (await getEmbeddingProvider().embedTexts([queryText]))[0];
@@ -693,11 +869,11 @@ async function searchSystemPatterns(projectName, queryText, limit = 10) {
         }
     });
 
-    return results.map(hit => ({
+    return results.map((hit: any) => ({
         id: hit.id,
-        pattern: hit.payload.content,
+        pattern: hit.payload?.content,
         score: hit.score,
-        timestamp: hit.payload.timestamp
+        timestamp: hit.payload?.timestamp
     }));
 }
 
@@ -705,15 +881,15 @@ async function searchSystemPatterns(projectName, queryText, limit = 10) {
 
 /**
  * Get progress entries with status information
- * @param {string} projectName - Name of the project
- * @param {string} status - Optional status filter ('pending', 'in_progress', 'completed', 'blocked')
- * @param {number} limit - Maximum number of entries to return
- * @returns {Array} Array of progress entries with status
+ * @param projectName - Name of the project
+ * @param status - Optional status filter ('pending', 'in_progress', 'completed', 'blocked')
+ * @param limit - Maximum number of entries to return
+ * @returns Array of progress entries with status
  */
-async function getProgressWithStatus(projectName, status = null, limit = 50) {
+async function getProgressWithStatus(projectName: string, status: ProgressStatus | null = null, limit: number = 50): Promise<ProgressEntry[]> {
     const collectionName = `memory_bank_${projectName}`;
 
-    const mustFilter = [
+    const mustFilter: any[] = [
         { key: "project", match: { value: projectName } },
         { key: "type", match: { value: PROGRESS_TYPE } }
     ];
@@ -728,26 +904,26 @@ async function getProgressWithStatus(projectName, status = null, limit = 50) {
         filter: { must: mustFilter }
     });
 
-    return results.map(hit => ({
+    return results.map((hit: any) => ({
         id: hit.id,
-        content: hit.payload.content,
-        status: hit.payload.status || "unknown",
-        category: hit.payload.category || "general",
-        priority: hit.payload.priority || "medium",
-        timestamp: hit.payload.timestamp
+        content: hit.payload?.content,
+        status: hit.payload?.status || "unknown",
+        category: hit.payload?.category || "general",
+        priority: hit.payload?.priority || "medium",
+        timestamp: hit.payload?.timestamp
     }));
 }
 
 /**
  * Update progress with status tracking
- * @param {string} projectName - Name of the project
- * @param {string} content - Progress content
- * @param {string} status - Status ('pending', 'in_progress', 'completed', 'blocked')
- * @param {string} category - Category of the progress item
- * @param {string} priority - Priority level ('low', 'medium', 'high', 'critical')
- * @returns {string} ID of the logged progress entry
+ * @param projectName - Name of the project
+ * @param content - Progress content
+ * @param status - Status ('pending', 'in_progress', 'completed', 'blocked')
+ * @param category - Category of the progress item
+ * @param priority - Priority level ('low', 'medium', 'high', 'critical')
+ * @returns ID of the logged progress entry
  */
-async function updateProgressWithStatus(projectName, content, status = "in_progress", category = "general", priority = "medium") {
+async function updateProgressWithStatus(projectName: string, content: string, status: ProgressStatus = "in_progress", category: string = "general", priority: Priority = "medium"): Promise<string> {
     const collectionName = await initMemoryBank(projectName);
 
     const vector = (await getEmbeddingProvider().embedTexts([content]))[0];
@@ -773,18 +949,18 @@ async function updateProgressWithStatus(projectName, content, status = "in_progr
 
 /**
  * Search progress entries using semantic search
- * @param {string} projectName - Name of the project
- * @param {string} queryText - Query for finding relevant progress entries
- * @param {string} status - Optional status filter
- * @param {number} limit - Maximum number of results to return
- * @returns {Array} Array of matching progress entries with scores
+ * @param projectName - Name of the project
+ * @param queryText - Query for finding relevant progress entries
+ * @param status - Optional status filter
+ * @param limit - Maximum number of results to return
+ * @returns Array of matching progress entries with scores
  */
-async function searchProgressEntries(projectName, queryText, status = null, limit = 10) {
+async function searchProgressEntries(projectName: string, queryText: string, status: ProgressStatus | null = null, limit: number = 10): Promise<ProgressSearchResult[]> {
     const collectionName = `memory_bank_${projectName}`;
 
     const vector = (await getEmbeddingProvider().embedTexts([queryText]))[0];
 
-    const mustFilter = [
+    const mustFilter: any[] = [
         { key: "project", match: { value: projectName } },
         { key: "type", match: { value: PROGRESS_TYPE } }
     ];
@@ -799,14 +975,14 @@ async function searchProgressEntries(projectName, queryText, status = null, limi
         filter: { must: mustFilter }
     });
 
-    return results.map(hit => ({
+    return results.map((hit: any) => ({
         id: hit.id,
-        content: hit.payload.content,
-        status: hit.payload.status || "unknown",
-        category: hit.payload.category || "general",
-        priority: hit.payload.priority || "medium",
+        content: hit.payload?.content,
+        status: hit.payload?.status || "unknown",
+        category: hit.payload?.category || "general",
+        priority: hit.payload?.priority || "medium",
         score: hit.score,
-        timestamp: hit.payload.timestamp
+        timestamp: hit.payload?.timestamp
     }));
 }
 
@@ -814,13 +990,13 @@ async function searchProgressEntries(projectName, queryText, status = null, limi
 
 /**
  * Store custom data with metadata
- * @param {string} projectName - Name of the project
- * @param {any} data - The custom data to store
- * @param {string} dataType - Type/category of the custom data
- * @param {object} metadata - Additional metadata (optional)
- * @returns {string} ID of the stored data
+ * @param projectName - Name of the project
+ * @param data - The custom data to store
+ * @param dataType - Type/category of the custom data
+ * @param metadata - Additional metadata (optional)
+ * @returns ID of the stored data
  */
-async function storeCustomData(projectName, data, dataType, metadata = {}) {
+async function storeCustomData(projectName: string, data: any, dataType: string, metadata: Record<string, any> = {}): Promise<string> {
     const collectionName = await initMemoryBank(projectName);
 
     const dataString = typeof data === 'string' ? data : JSON.stringify(data);
@@ -847,19 +1023,17 @@ async function storeCustomData(projectName, data, dataType, metadata = {}) {
 
 /**
  * Get custom data by ID
- * @param {string} projectName - Name of the project
- * @param {string} dataId - ID of the custom data
- * @returns {object|null} The custom data object or null if not found
+ * @param projectName - Name of the project
+ * @param dataId - ID of the custom data
+ * @returns The custom data object or null if not found
  */
-async function getCustomData(projectName, dataId) {
+async function getCustomData(projectName: string, dataId: string): Promise<CustomDataEntry | null> {
     try {
         // Use queryCustomData to get all custom data, then filter by ID
         const allCustomData = await queryCustomData(projectName, null, {}, 100); // Get up to 100 items
 
         // Find the specific item by ID
         const foundItem = allCustomData.find(item => item.id === dataId);
-
-        // Debug: check what we found
 
         return foundItem || null;
     } catch (error) {
@@ -870,16 +1044,16 @@ async function getCustomData(projectName, dataId) {
 
 /**
  * Query custom data with filters
- * @param {string} projectName - Name of the project
- * @param {string} dataType - Optional data type filter
- * @param {object} metadataFilter - Optional metadata filters
- * @param {number} limit - Maximum number of results
- * @returns {Array} Array of custom data objects
+ * @param projectName - Name of the project
+ * @param dataType - Optional data type filter
+ * @param metadataFilter - Optional metadata filters
+ * @param limit - Maximum number of results
+ * @returns Array of custom data objects
  */
-async function queryCustomData(projectName, dataType = null, metadataFilter = {}, limit = 50) {
+async function queryCustomData(projectName: string, dataType: string | null = null, _metadataFilter: Record<string, any> = {}, limit: number = 50): Promise<CustomDataEntry[]> {
     const collectionName = `memory_bank_${projectName}`;
 
-    const mustFilter = [
+    const mustFilter: any[] = [
         { key: "project", match: { value: projectName } },
         { key: "type", match: { value: CUSTOM_DATA_TYPE } }
     ];
@@ -897,45 +1071,45 @@ async function queryCustomData(projectName, dataType = null, metadataFilter = {}
         filter: { must: mustFilter }
     });
 
-    return results.map(hit => {
-        let parsedData;
+    return results.map((hit: any) => {
+        let parsedData: any;
         try {
-            parsedData = JSON.parse(hit.payload.data);
+            parsedData = JSON.parse(hit.payload?.data);
         } catch (e) {
-            parsedData = hit.payload.data;
+            parsedData = hit.payload?.data;
         }
 
-        let parsedMetadata = {};
+        let parsedMetadata: Record<string, any> = {};
         try {
-            parsedMetadata = JSON.parse(hit.payload.metadata);
+            parsedMetadata = JSON.parse(hit.payload?.metadata);
         } catch (e) {
             // metadata might not be JSON
         }
 
         return {
             id: hit.id,
-            dataType: hit.payload.dataType,
+            dataType: hit.payload?.dataType,
             data: parsedData,
             metadata: parsedMetadata,
-            timestamp: hit.payload.timestamp
+            timestamp: hit.payload?.timestamp
         };
     });
 }
 
 /**
  * Search custom data using semantic search
- * @param {string} projectName - Name of the project
- * @param {string} queryText - Query for finding relevant custom data
- * @param {string} dataType - Optional data type filter
- * @param {number} limit - Maximum number of results
- * @returns {Array} Array of matching custom data with scores
+ * @param projectName - Name of the project
+ * @param queryText - Query for finding relevant custom data
+ * @param dataType - Optional data type filter
+ * @param limit - Maximum number of results
+ * @returns Array of matching custom data with scores
  */
-async function searchCustomData(projectName, queryText, dataType = null, limit = 10) {
+async function searchCustomData(projectName: string, queryText: string, dataType: string | null = null, limit: number = 10): Promise<CustomDataSearchResult[]> {
     const collectionName = `memory_bank_${projectName}`;
 
     const vector = (await getEmbeddingProvider().embedTexts([queryText]))[0];
 
-    const mustFilter = [
+    const mustFilter: any[] = [
         { key: "project", match: { value: projectName } },
         { key: "type", match: { value: CUSTOM_DATA_TYPE } }
     ];
@@ -950,41 +1124,41 @@ async function searchCustomData(projectName, queryText, dataType = null, limit =
         filter: { must: mustFilter }
     });
 
-    return results.map(hit => {
-        let parsedData;
+    return results.map((hit: any) => {
+        let parsedData: any;
         try {
-            parsedData = JSON.parse(hit.payload.data);
+            parsedData = JSON.parse(hit.payload?.data);
         } catch (e) {
-            parsedData = hit.payload.data;
+            parsedData = hit.payload?.data;
         }
 
-        let parsedMetadata = {};
+        let parsedMetadata: Record<string, any> = {};
         try {
-            parsedMetadata = JSON.parse(hit.payload.metadata);
+            parsedMetadata = JSON.parse(hit.payload?.metadata);
         } catch (e) {
             // metadata might not be JSON
         }
 
         return {
             id: hit.id,
-            dataType: hit.payload.dataType,
+            dataType: hit.payload?.dataType,
             data: parsedData,
             metadata: parsedMetadata,
             score: hit.score,
-            timestamp: hit.payload.timestamp
+            timestamp: hit.payload?.timestamp
         };
     });
 }
 
 /**
  * Update custom data
- * @param {string} projectName - Name of the project
- * @param {string} dataId - ID of the data to update
- * @param {any} newData - New data to store
- * @param {object} newMetadata - Updated metadata (optional)
- * @returns {boolean} Success status
+ * @param projectName - Name of the project
+ * @param dataId - ID of the data to update
+ * @param newData - New data to store
+ * @param newMetadata - Updated metadata (optional)
+ * @returns Success status
  */
-async function updateCustomData(projectName, dataId, newData, newMetadata = {}) {
+async function updateCustomData(projectName: string, dataId: string, newData: any, newMetadata: Record<string, any> = {}): Promise<boolean> {
     const collectionName = `memory_bank_${projectName}`;
 
     const dataString = typeof newData === 'string' ? newData : JSON.stringify(newData);
@@ -1009,16 +1183,16 @@ async function updateCustomData(projectName, dataId, newData, newMetadata = {}) 
 
 /**
  * Initialize workspace and detect project structure
- * @param {string} projectName - Name of the project
- * @param {object} workspaceInfo - Workspace information (optional)
- * @returns {object} Initialization result with detected workspace structure
+ * @param projectName - Name of the project
+ * @param workspaceInfo - Workspace information (optional)
+ * @returns Initialization result with detected workspace structure
  */
-async function initializeWorkspace(projectName, workspaceInfo = {}) {
+async function initializeWorkspace(projectName: string, workspaceInfo: WorkspaceInfo = {}): Promise<InitializationResult> {
     try {
         const collectionName = await initMemoryBank(projectName);
 
         // Detect workspace structure
-        const workspaceStructure = {
+        const workspaceStructure: WorkspaceStructure = {
             projectName,
             detectedFiles: workspaceInfo.files || [],
             detectedDirectories: workspaceInfo.directories || [],
@@ -1055,7 +1229,7 @@ async function initializeWorkspace(projectName, workspaceInfo = {}) {
         };
     } catch (error) {
         // Fallback: return workspace structure without storing when Qdrant is unavailable
-        const workspaceStructure = {
+        const workspaceStructure: WorkspaceStructure = {
             projectName,
             detectedFiles: workspaceInfo.files || [],
             detectedDirectories: workspaceInfo.directories || [],
@@ -1075,14 +1249,14 @@ async function initializeWorkspace(projectName, workspaceInfo = {}) {
 
 /**
  * Detect project language from file extensions
- * @param {object} workspaceInfo - Workspace information
- * @returns {string} Detected language
+ * @param workspaceInfo - Workspace information
+ * @returns Detected language
  */
-function detectProjectLanguage(workspaceInfo) {
+function detectProjectLanguage(workspaceInfo: WorkspaceInfo): string {
     const files = workspaceInfo.files || [];
-    const extensions = files.map(f => f.split('.').pop()).filter(Boolean);
+    const extensions = files.map(f => f.split('.').pop()).filter((ext): ext is string => !!ext);
 
-    const languageMap = {
+    const languageMap: Record<string, string> = {
         'js': 'JavaScript',
         'ts': 'TypeScript',
         'py': 'Python',
@@ -1107,10 +1281,10 @@ function detectProjectLanguage(workspaceInfo) {
 
 /**
  * Detect framework from common files/directories
- * @param {object} workspaceInfo - Workspace information
- * @returns {string} Detected framework
+ * @param workspaceInfo - Workspace information
+ * @returns Detected framework
  */
-function detectFramework(workspaceInfo) {
+function detectFramework(workspaceInfo: WorkspaceInfo): string {
     const files = workspaceInfo.files || [];
     const directories = workspaceInfo.directories || [];
 
@@ -1152,9 +1326,9 @@ function detectFramework(workspaceInfo) {
 
 /**
  * Initialize basic memory contexts for a new project
- * @param {string} projectName - Name of the project
+ * @param projectName - Name of the project
  */
-async function initializeBasicContexts(projectName) {
+async function initializeBasicContexts(projectName: string): Promise<void> {
     // Check if contexts already exist
     const existingProductContext = await getStructuredContext(projectName, 'productContext');
     const existingActiveContext = await getStructuredContext(projectName, 'activeContext');
@@ -1182,12 +1356,12 @@ async function initializeBasicContexts(projectName) {
 
 /**
  * Sync memory with external sources (proactive logging)
- * @param {string} projectName - Name of the project
- * @param {Array} syncSources - Array of sync source configurations
- * @returns {object} Sync results
+ * @param projectName - Name of the project
+ * @param syncSources - Array of sync source configurations
+ * @returns Sync results
  */
-async function syncMemory(projectName, syncSources = []) {
-    const syncResults = {
+async function syncMemory(projectName: string, syncSources: SyncSource[] = []): Promise<SyncResult> {
+    const syncResults: SyncResult = {
         timestamp: new Date().toISOString(),
         sources: [],
         totalEntries: 0,
@@ -1206,7 +1380,7 @@ async function syncMemory(projectName, syncSources = []) {
         } catch (error) {
             syncResults.errors.push({
                 source: source.name,
-                error: error.message
+                error: (error as Error).message
             });
         }
     }
@@ -1219,22 +1393,22 @@ async function syncMemory(projectName, syncSources = []) {
 
 /**
  * Sync from a specific source (placeholder for external integrations)
- * @param {string} projectName - Name of the project
- * @param {object} source - Source configuration
- * @returns {object} Sync result for this source
+ * @param projectName - Name of the project
+ * @param source - Source configuration
+ * @returns Sync result for this source
  */
-async function syncFromSource(projectName, source) {
+async function syncFromSource(projectName: string, source: SyncSource): Promise<{ entries: number }> {
     // This is a placeholder for actual sync implementations
     // Could be GitHub issues, Jira tickets, Slack messages, etc.
 
-    const entries = [];
+    const entries: Array<{ type: MemoryType; content: string; category?: string }> = [];
 
     // Example: sync from Git commits (placeholder)
     if (source.type === 'git') {
         // Placeholder - would actually fetch git history
         entries.push({
             type: 'progress',
-            content: `Synced git history from ${source.repository}`,
+            content: `Synced git history from ${source.config?.repository || 'repository'}`,
             category: 'development'
         });
     }
@@ -1252,23 +1426,23 @@ async function syncFromSource(projectName, source) {
 
 /**
  * Export memory data to markdown format
- * @param {string} projectName - Name of the project
- * @param {Array} memoryTypes - Types of memory to export
- * @returns {string} Markdown formatted export
+ * @param projectName - Name of the project
+ * @param memoryTypes - Types of memory to export
+ * @returns Markdown formatted export
  */
-async function exportMemoryToMarkdown(projectName, memoryTypes = null) {
+async function exportMemoryToMarkdown(projectName: string, memoryTypes: MemoryType[] | null = null): Promise<string> {
     try {
-        const exportData = {
+        const exportData: ExportData = {
             projectName,
             exportDate: new Date().toISOString(),
             sections: {}
         };
 
-        const typesToExport = memoryTypes || ['productContext', 'activeContext', 'systemPatterns', 'decisionLog', 'progress'];
+        const typesToExport = memoryTypes || ['productContext', 'activeContext', 'systemPatterns', 'decisionLog', 'progress'] as MemoryType[];
 
         for (const type of typesToExport) {
-            if (STRUCTURED_CONTEXT_TYPES.includes(type)) {
-                const context = await getStructuredContext(projectName, type);
+            if (STRUCTURED_CONTEXT_TYPES.includes(type as any)) {
+                const context = await getStructuredContext(projectName, type as "productContext" | "activeContext");
                 exportData.sections[type] = context;
             } else {
                 // For non-structured types, get recent entries
@@ -1284,7 +1458,7 @@ async function exportMemoryToMarkdown(projectName, memoryTypes = null) {
         return convertToMarkdown(exportData);
     } catch (error) {
         // Fallback: return basic markdown when Qdrant is unavailable
-        const exportData = {
+        const exportData: ExportData = {
             projectName,
             exportDate: new Date().toISOString(),
             sections: {
@@ -1298,12 +1472,12 @@ async function exportMemoryToMarkdown(projectName, memoryTypes = null) {
 
 /**
  * Import memory data from markdown
- * @param {string} projectName - Name of the project
- * @param {string} markdownContent - Markdown content to import
- * @returns {object} Import results
+ * @param projectName - Name of the project
+ * @param markdownContent - Markdown content to import
+ * @returns Import results
  */
-async function importMemoryFromMarkdown(projectName, markdownContent) {
-    const importResults = {
+async function importMemoryFromMarkdown(projectName: string, markdownContent: string): Promise<ImportResult> {
+    const importResults: ImportResult = {
         imported: 0,
         errors: [],
         timestamp: new Date().toISOString()
@@ -1313,19 +1487,19 @@ async function importMemoryFromMarkdown(projectName, markdownContent) {
         const parsedData = parseMarkdownToMemory(markdownContent);
 
         for (const [type, entries] of Object.entries(parsedData.sections)) {
-            if (STRUCTURED_CONTEXT_TYPES.includes(type)) {
-                await logStructuredMemory(projectName, type, entries);
+            if (STRUCTURED_CONTEXT_TYPES.includes(type as any)) {
+                await logStructuredMemory(projectName, type as "productContext" | "activeContext", entries);
                 importResults.imported++;
             } else {
                 // Import as regular memory entries
-                for (const entry of entries) {
-                    await logMemory(projectName, type, entry.content);
+                for (const entry of entries as any[]) {
+                    await logMemory(projectName, type as MemoryType, entry.content);
                     importResults.imported++;
                 }
             }
         }
     } catch (error) {
-        importResults.errors.push(error.message);
+        importResults.errors.push((error as Error).message);
     }
 
     return importResults;
@@ -1333,10 +1507,10 @@ async function importMemoryFromMarkdown(projectName, markdownContent) {
 
 /**
  * Convert memory data to markdown format
- * @param {object} exportData - Data to convert
- * @returns {string} Markdown string
+ * @param exportData - Data to convert
+ * @returns Markdown string
  */
-function convertToMarkdown(exportData) {
+function convertToMarkdown(exportData: ExportData): string {
     let markdown = `# Memory Export - ${exportData.projectName}\n\n`;
     markdown += `**Export Date:** ${new Date(exportData.exportDate).toLocaleString()}\n\n`;
 
@@ -1344,7 +1518,7 @@ function convertToMarkdown(exportData) {
         markdown += `## ${section.charAt(0).toUpperCase() + section.slice(1)}\n\n`;
 
         if (Array.isArray(data)) {
-            data.forEach((item, index) => {
+            data.forEach((item: any, index: number) => {
                 markdown += `### Entry ${index + 1}\n`;
                 markdown += `${item.content}\n\n`;
                 if (item.timestamp) {
@@ -1370,15 +1544,15 @@ function convertToMarkdown(exportData) {
 
 /**
  * Parse markdown back to memory structure
- * @param {string} markdown - Markdown content
- * @returns {object} Parsed memory data
+ * @param markdown - Markdown content
+ * @returns Parsed memory data
  */
-function parseMarkdownToMemory(markdown) {
+function parseMarkdownToMemory(markdown: string): { sections: Record<string, any> } {
     // Simple markdown parser - would need more sophisticated parsing for complex structures
-    const sections = {};
+    const sections: Record<string, any> = {};
     const lines = markdown.split('\n');
-    let currentSection = null;
-    let currentEntry = null;
+    let currentSection: string | null = null;
+    let currentEntry: any = null;
 
     for (const line of lines) {
         if (line.startsWith('## ')) {
@@ -1401,13 +1575,13 @@ function parseMarkdownToMemory(markdown) {
 
 /**
  * Analyze conversation and automatically log relevant information
- * @param {string} projectName - Name of the project
- * @param {string} conversationText - Conversation text to analyze
- * @param {object} metadata - Additional metadata about the conversation
- * @returns {object} Analysis results
+ * @param projectName - Name of the project
+ * @param conversationText - Conversation text to analyze
+ * @param metadata - Additional metadata about the conversation
+ * @returns Analysis results
  */
-async function analyzeConversation(projectName, conversationText, metadata = {}) {
-    const analysisResults = {
+async function analyzeConversation(projectName: string, conversationText: string, metadata: ConversationMetadata = {}): Promise<AnalysisResults> {
+    const analysisResults: AnalysisResults = {
         decisions: [],
         progress: [],
         questions: [],
@@ -1449,7 +1623,7 @@ async function analyzeConversation(projectName, conversationText, metadata = {})
     }
 
     // Log the analysis results
-    const entries = [];
+    const entries: BatchLogEntry[] = [];
 
     analysisResults.decisions.forEach(decision => {
         entries.push({
@@ -1495,9 +1669,9 @@ async function analyzeConversation(projectName, conversationText, metadata = {})
 
 /**
  * Get cache performance statistics
- * @returns {object} Cache statistics
+ * @returns Cache statistics
  */
-function getCacheStats() {
+function getCacheStats(): CacheStats {
     return cacheUtils.getStats();
 }
 
